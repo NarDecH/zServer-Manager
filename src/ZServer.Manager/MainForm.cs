@@ -481,6 +481,9 @@ public sealed class MainForm : Form
         ApplyCard(_lblPhpState, _lblPhpDetail, _lastPhp);
         ApplyCard(_lblDbState, _lblDbDetail, _lastDb);
 
+        StyleStartButton(_btnApacheStart, _lastApache.State == ComponentState.Running);
+        StyleStartButton(_btnDbStart, _lastDb.State == ComponentState.Running);
+
         _btnApacheStart.Enabled = !_busy && _lastApache.State is ComponentState.Stopped or ComponentState.PortConflict or ComponentState.Error;
         _btnApacheStop.Enabled = !_busy && _lastApache.State == ComponentState.Running;
         _btnApacheRestart.Enabled = !_busy && _lastApache.State == ComponentState.Running;
@@ -491,6 +494,24 @@ public sealed class MainForm : Form
 
         _statusLabel.Text = $"Apache: {_lastApache.StateText}   |   MariaDB: {_lastDb.StateText}   |   PHP: {_lastPhp.StateText}";
         _tray.Text = $"zServer — Apache: {_lastApache.StateText} | MariaDB: {_lastDb.StateText}";
+    }
+
+    /// <summary>ปุ่ม "เริ่ม" เป็นสีเขียวเมื่อเซอร์วิสกำลังทำงานอยู่ (เป็นตัวบอกสถานะประกอบการ์ด)</summary>
+    private static void StyleStartButton(Button b, bool running)
+    {
+        if (running)
+        {
+            b.FlatStyle = FlatStyle.Flat;
+            b.FlatAppearance.BorderColor = Color.FromArgb(16, 110, 52);
+            b.BackColor = Color.FromArgb(20, 130, 60);
+            b.ForeColor = Color.White;
+        }
+        else
+        {
+            b.FlatStyle = FlatStyle.System;
+            b.UseVisualStyleBackColor = true;
+            b.ForeColor = SystemColors.ControlText;
+        }
     }
 
     private static void ApplyCard(Label stateLabel, Label detailLabel, ComponentStatus st)

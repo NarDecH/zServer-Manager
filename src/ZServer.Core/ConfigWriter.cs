@@ -38,6 +38,8 @@ public sealed class ConfigWriter
     private static void WriteFile(string path, string content, Encoding? enc = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        // Windows ใช้ CRLF — ไฟล์ config ที่ไม่มี CRLF เปิดใน Notepad/TextBox จะติดกันเป็นบรรทัดเดียว
+        content = content.Replace("\r\n", "\n").Replace("\n", "\r\n");
         File.WriteAllText(path, content, enc ?? new UTF8Encoding(false));
     }
 

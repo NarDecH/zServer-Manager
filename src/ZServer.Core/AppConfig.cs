@@ -185,7 +185,8 @@ public sealed class AppConfig
     {
         UpdatedAt = DateTime.Now;
         Directory.CreateDirectory(paths.Root);
-        var json = JsonSerializer.Serialize(this, JsonOpts);
+        var json = JsonSerializer.Serialize(this, JsonOpts)
+            .Replace("\r\n", "\n").Replace("\n", "\r\n"); // CRLF สำหรับ Windows
         File.WriteAllText(paths.ConfigFile, json, new UTF8Encoding(false));
     }
 

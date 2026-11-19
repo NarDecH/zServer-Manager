@@ -101,7 +101,9 @@ public sealed class ConfigEditorForm : Form
         try
         {
             _txtEditor.ReadOnly = false;
-            _txtEditor.Text = File.ReadAllText(choice.Path);
+            // TextBox ของ Windows ขึ้นบรรทัดเฉพาะ CRLF — ไฟล์ที่เก็บแบบ LF ต้องแปลงก่อนแสดง
+            _txtEditor.Text = File.ReadAllText(choice.Path)
+                .Replace("\r\n", "\n").Replace("\n", "\r\n");
             _txtEditor.SelectionStart = 0;
         }
         catch (Exception ex)

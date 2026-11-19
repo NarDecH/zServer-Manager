@@ -1,0 +1,28 @@
+# ===== .NET =====
+**/bin/
+**/obj/
+*.user
+.vs/
+*.suo
+
+# ===== โฟลเดอร์ที่โปรแกรมสร้างตอนใช้งาน (runtime stack / ข้อมูลผู้ใช้) =====
+apache/
+php/
+mariadb/
+data/
+logs/
+backups/
+downloads/
+www/
+zserver.json
+logs-selftest-net.txt
+
+# ===== ผลลัพธ์ build ตัวติดตั้ง =====
+installer/Output/
+
+# ===== อื่น ๆ =====
+Thumbs.db
+Desktop.ini
+
+# ===== ZCode internal =====
+.zcode/

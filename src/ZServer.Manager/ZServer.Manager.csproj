@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>ZServer.Manager</RootNamespace>
+    <AssemblyName>ZServerManager</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>assets\zserver.ico</ApplicationIcon>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Version>1.1.0</Version>
+    <Product>zServer Manager</Product>
+    <Description>โปรแกรมจัดการ Apache / PHP / MariaDB — ติดตั้ง ตั้งค่า อัพเดท เปิด-ปิดเซอร์วิส</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="assets\zserver.ico" LogicalName="zserver.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZServer.Core\ZServer.Core.csproj" />
+  </ItemGroup>
+
+</Project>

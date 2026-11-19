@@ -1,0 +1,78 @@
+# บันทึกการเปลี่ยนแปลง (Changelog)
+
+รูปแบบตาม [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) เรียงจากใหม่ไปเก่า
+
+## [1.1.0] — 2026-11-20
+
+### เพิ่ม (ฟีเจอร์)
+- **Virtual Hosts**: แท็บใหม่ในหน้าตั้งค่า — เพิ่มหลายเว็บ (ชื่อโดเมน + โฟลเดอร์) → สร้าง `conf\zserver-vhosts.conf` + ซิงก์ hosts file ให้อัตโนมัติ (สำรองเดิมก่อน, แก้เฉพาะ section ของ zServer)
+- **HTTPS ผ่าน mkcert**: ปุ่มสร้างใบรับรองทดสอบ (ดาวน์โหลด mkcert จาก GitHub อัตโนมัติ + ติดตั้ง root CA เข้า trust store) → เปิด mod_ssl พอร์ต 443 — config จะเปิดเมื่อไฟล์ใบรับรองมีจริงเท่านั้น (กัน `httpd -t` พัง)
+- **Adminer**: ติดตั้งจัดการฐานข้อมูลผ่านเว็บในปุ่มเดียว (ดาวน์โหลดไฟล์เดียวจาก adminer.org → `www\adminer.php`, สำรองตัวเก่าเป็น .bak)
+- **ความปลอดภัย MariaDB**: `bind-address = 127.0.0.1` เป็นค่าเริ่มต้น (ฟัง localhost เท่านั้น — ยืนยันด้วย netstat จริง) ปิดได้ในหน้าตั้งค่าพร้อมเตือน + แจ้งตั้งรหัสผ่าน root ทันทีหลังติดตั้งถ้ายังว่าง
+- **Log rotation อัตโนมัติ**: log เก่ากว่า N วัน (ค่าเริ่ม 14, ตั้งได้, 0 = ปิด) บีบอัดเก็บ `backups\log-archives\` แล้วลบ — ไฟล์ที่ถูกล็อคข้ามไว้ก่อน
+- **เสนอพอร์ตว่างอัตโนมัติ**: ตอนติดตั้งถ้าพอร์ตชน เลือก "เปลี่ยนพอร์ตอัตโนมัติ" → หาพอร์ตว่าง + เขียน config ให้เอง
+- **Extensions แสดงผลใหม่**: แบ่งหมวดหมู่ (ฐานข้อมูล / ข้อความ / เว็บ) พร้อมคำอธิบายไทย + ตรวจไฟล์ `php_*.dll` จริง (ไม่มี → เทาพร้อมหมายเหตุ) เรียงบรรทัดตรงแนว
+- ปุ่ม **เปิด Terminal** (cmd ที่ www\ พร้อม php + mariadb\bin ใน PATH) และ **คู่มือการใช้งาน** (เปิดโฟลเดอร์ docs\)
+- **ธีมมืด/สว่าง**: สลับผ่าน tray menu หรือแท็บ ทั่วไป — ทาสีทุกฟอร์มแบบเจาะจงประเภท control, กล่อง log คงโทน terminal ทุกธีม, จำค่าไว้ใน zserver.json
+- **Remote catalog + self-update plumbing**: ตั้ง `RemoteCatalogUrl` (catalog.json เสริม) และ `ProgramUpdateUrl` (`{version, url}` แจ้งเวอร์ชันตัวโปรแกรม) ใน zserver.json
+- GitHub Actions workflow (`.github\workflows\build.yml`) — build exe อัตโนมัติทุก push
+
+### เพิ่ม (การแจกจ่าย)
+- **ตัวติดตั้ง Setup.exe** (Inno Setup): `installer\zserver-setup.iss` → `zServer-Setup-1.1.0.exe` — ติดตั้งลง `C:\zServer` (เปลี่ยนได้ใน wizard) + shortcut เมนู/desktop + คู่มือ offline + ไอคอนโปรแกรม; ถอนติดตั้งเฉพาะไฟล์โปรแกรม (ไม่ลบเซอร์วิส/ข้อมูลผู้ใช้)
+
+### เปลี่ยนแปลง
+- เวอร์ชันโปรแกรมเป็น 1.1.0 (ใช้เทียบในระบบแจ้งอัพเดตตัวโปรแกรม)
+
+## [1.0.0] — 2026-11-19
+
+### เพิ่ม (Added)
+- โปรแกรมหลัก `bin\ZServerManager.exe` (C# / .NET 10 WinForms, single-file self-contained)
+- หน้าแดชบอร์ด: สถานะ Apache/PHP/MariaDB แบบสด (อัพเดตทุก 3 วิ) + ปุ่มเริ่ม/หยุด/รีสตาร์ท + log สด + status bar
+- Tray icon พร้อมเมนูควบคุมด่วน (เริ่มทั้งหมด/หยุดทั้งหมด/เปิด localhost/ออก) และย่อหน้าต่างไป tray
+- หน้าติดตั้ง: เลือกเวอร์ชัน → ดาวน์โหลดจากเว็บทางการ (ตรวจ SHA256) → แตกไฟล์ → เขียน config → init ข้อมูล MariaDB → ติดตั้ง Windows Service; ตรวจ/ติดตั้ง VC++ Redistributable ให้
+- หน้าอัพเดท: ตรวจเวอร์ชันล่าสุดจากเว็บทางการ (PHP releases.json / ApacheLounge / MariaDB archive) และอัพเดทแบบสำรองโฟลเดอร์เดิม
+- หน้าตั้งค่า 4 แท็บ (Apache / PHP / MariaDB / เซอร์วิส) + ตั้งรหัสผ่าน root MariaDB + จัดการเซอร์วิสโดยตรง
+- หน้าแก้ไฟล์ config (httpd.conf / php.ini / my.ini / zserver.json) พร้อมสำรองอัตโนมัติและ `httpd -t` หลังบันทึก
+- หน้าดู Logs รวม 5 ไฟล์ + รีเฟรชอัตโนมัติ
+- ระบบตรวจพอร์ตชนก่อนเริ่มเซอร์วิส พร้อมแจ้งโปรเซสที่ใช้พอร์ตและวิธีแก้ (รองรับกรณี XAMPP อยู่ที่ 80/3306)
+- เปิดพอร์ต Windows Firewall ผ่านปุ่มเดียว
+- โหมดการทำงาน 2 แบบ: Windows Service และ Process mode (แบบ XAMPP)
+- สร้างหน้าเว็บตัวอย่าง `www\index.php` + `phpinfo.php` หลังติดตั้ง
+- โปรแกรมทดสอบ `tools\ZServer.SelfTest` (35 ข้อออฟไลน์ + ทดสอบเน็ตดาวน์โหลดจริง)
+
+### เทคนิค (Technical)
+- รองรับ Apache 2.4.71 (VS18) / 2.4.66 (VS17), PHP 8.5.13 / 8.4.28 / 8.3.37 (Thread Safe x64), MariaDB 11.8.6 / 11.4.10 / 10.11.16
+- ตรวจสอบ URL ทางการ + SHA256 จริง ณ วันที่ 2026-11-19 (Apache มี hash จากเจ้าของเว็บ, PHP มาจาก releases.json)
+- ป้องกัน Zip Slip ตอนแตกไฟล์; จัดการโครงสร้าง zip หลายรากของ ApacheLounge (Apache24/ + ReadMe + marker) และ zip PHP แบบไม่มีโฟลเดอร์ราก
+- **httpd.conf โหลดเฉพาะโมดูลที่มีไฟล์ .so จริง** — build ใหม่ของ ApacheLounge คอมไพล์ mod_mpm_winnt รวมใน httpd.exe แล้ว (ยืนยันด้วยการรัน Apache+PHP จริงและเรียกหน้า PHP ผ่าน HTTP ได้)
+- ใส่ mod_filter ให้ `AddOutputFilterByType` (ย้ายจาก mod_deflate ตั้งแต่ Apache 2.3.7)
+- php.ini ใช้ระบบ managed block (แทรกท้ายไฟล์ เขียนซ้ำไม่ซ้อน)
+- ตรวจ SHA256 หลังปิด stream (แก้ bug ล็อคไฟล์ตอนแรก)
+- my.ini ตัด `log_timestamps` ออก — เป็นตัวแปรเฉพาะ MySQL ที่ MariaDB ปฏิเสธ (พบจากการติดตั้งจริง)
+- httpd.conf กำหนด `PidFile` ชัดเจน + สร้าง `apache\logs\` อัตโนมัติ (แก้ปัญหา service เริ่มไม่ได้เพราะหาโฟลเดอร์ pid ไม่เจอ)
+- เครื่องมือ CLI installer `tools\ZServer.Installer` (ติดตั้ง/เริ่มเซอร์วิสจาก command line สำหรับ scripting)
+- การตรวจ VC++ Redistributable ใช้การเช็คไฟล์ runtime DLL ใน System32 เป็นหลัก (vcruntime140.dll / vcruntime140_1.dll / msvcp140.dll) — วิธีเดิมที่ดูเฉพาะ registry ทำให้เครื่องที่ไม่มี key แต่ runtime ใช้ได้จริงถูกเตือนผิด ๆ
+- **CatalogService**: หน้าติดตั้งดึงรายการเวอร์ชันใหม่ล่าสุดจากเว็บทางการอัตโนมัติ (PHP: releases.json พร้อม SHA256 / Apache: หน้า ApacheLounge / MariaDB: archive) รวมกับแคตตาล็อกที่ pin ไว้ — เวอร์ชันใหม่ที่ออกทีหลังจะปรากฏให้เลือกเองโดยไม่ต้องอัพเดตโปรแกรม
+- เพิ่ม PHP 8.6.0 (VS18) ในแคตตาล็อกพร้อม SHA256 ที่ตรวจแล้ว
+- **โลโก้ประจำโปรแกรม** (ตัว Z gradient + LED สถานะเซิร์ฟเวอร์ 3 ดวง บนพื้น dark tile): ใช้เป็นไอคอนไฟล์ exe, หน้าต่างหลัก, tray icon และภาพประกอบเอกสาร — ต้นฉบับเจนด้วยสคริปต์ `tools\icon\make_icon.py` แก้ไข/สร้างใหม่ได้
+- **แจ้งเตือนเวอร์ชันใหม่อัตโนมัติ**: ตรวจจากเว็บทางการตอนเปิดโปรแกรม + ทุก 6 ชม. — เจอเวอร์ชันใหม่กว่าที่ติดตั้งจะขึ้นป้าย "มีเวอร์ชันใหม่ ★" บนหน้าหลัก และเด้ง balloon จาก tray (กดเปิดหน้าอัพเดทได้ทันที); เก็บเวลาตรวจล่าสุดใน zserver.json กันตรวจถี่เกิน
+- ช่อง log สดเลื่อนตามข้อความใหม่อัตโนมัติ (ถ้าผู้ใช้เลื่อนขึ้นอ่านของเก่าจะไม่ดึงลงเอง) + ปุ่ม "ล้าง log" บนหน้าหลัก
+- เปิดโปรแกรมมาขยายเต็มจอเสมอ
+- **กัน log ล้นตั้งแต่ต้นทาง**: ComponentManager เขียน log เฉพาะเมื่อเปลี่ยนขั้นงานหรือ 100% (ก่อนหน้านี้เขียนทุก tick ของดาวน์โหลด ~5 บรรทัด/วินาที ทำให้ทั้งช่อง log สดและไฟล์ log รกมาก); หน้าติดตั้ง/อัพเดทใช้ ProgressLogFilter บันทึกหมุดหมายทุก ~10% แทน
+- **ตั้งค่าเปิดโปรแกรมอัตโนมัติเมื่อเข้าสู่ระบบ Windows** (แท็บ "ทั่วไป" ในหน้าตั้งค่า) — ทำผ่าน Task Scheduler (`/sc onlogon /rl highest`) เพราะแอป requireAdministrator ใช้ Startup folder/Run key ไม่ได้; ปุ่ม "ล้างไฟล์ log" ล้าง `zserver-manager.log` พร้อมยืนยันแสดงขนาดไฟล์
+- **หมุนเวียน log อัตโนมัติ** (LogRotator): log เก่ากว่า N วัน (ค่าเริ่ม 14, ตั้งได้ในแท็บ ทั่วไป, 0 = ปิด) ถูกบีบอัดเก็บที่ `backups\log-archives\` แล้วลบต้นฉบับ — ไฟล์ที่ถูกล็อคข้ามไว้ก่อน
+- **Virtual Hosts**: แท็บใหม่ในหน้าตั้งค่า — เพิ่มหลายเว็บ (ชื่อโดเมน + โฟลเดอร์) → สร้าง `conf\zserver-vhosts.conf` + ซิงก์ hosts file (สำรองเดิมก่อน, แก้เฉพาะ section ของ zServer) → เข้าได้ที่ http://ชื่อโดเมน
+- **HTTPS ผ่าน mkcert**: ปุ่มสร้างใบรับรองทดสอบ (ดาวน์โหลด mkcert จาก GitHub อัตโนมัติ, ติดตั้ง root CA เข้า trust store) → เปิด mod_ssl + port 443 จากหน้าตั้งค่า (config จะเปิดเมื่อไฟล์ใบรับรองมีจริงเท่านั้น)
+- **Adminer**: ติดตั้งจัดการฐานข้อมูลผ่านเว็บในปุ่มเดียว (ดาวน์โหลดไฟล์เดียวจาก adminer.org → `www\adminer.php` + สำรองตัวเก่า)
+- **ความปลอดภัย MariaDB**: `bind-address = 127.0.0.1` เป็นค่าเริ่มต้น (ฟัง localhost เท่านั้น, ปิดได้ในหน้าตั้งค่าพร้อมเตือน) + แจ้งตั้งรหัสผ่าน root ทันทีหลังติดตั้งถ้ายังว่าง
+- **เสนอพอร์ตว่างอัตโนมัติ**: ตอนติดตั้งถ้าพอร์ตชน เลือก "เปลี่ยนพอร์ตอัตโนมัติ" ได้ (โปรแกรมหาพอร์ตว่างและเขียน config ให้เอง)
+- ปุ่ม **เปิด Terminal** (cmd ที่ www\ พร้อม php + mariadb\bin ใน PATH) และปุ่ม **คู่มือการใช้งาน** (เปิดโฟลเดอร์ docs\)
+- **รองรับ catalog ระยะไกล**: ตั้ง `RemoteCatalogUrl` ใน zserver.json เพื่อเพิ่มรายการเวอร์ชันจากไฟล์ JSON ของตัวเอง (รูปแบบเดียวกับ CatalogItem) และ `ProgramUpdateUrl` `{version,url}` สำหรับแจ้งอัพเดตตัวโปรแกรมเอง
+- เพิ่ม GitHub Actions workflow (`.github/workflows/build.yml`) — build exe อัตโนมัติทุก push
+
+### เอกสาร (Documentation)
+- README.md (ราก), docs/README_TH.md, INSTALL_TH.md, USER_GUIDE_TH.md, CONFIG_REFERENCE_TH.md, TROUBLESHOOTING_TH.md, ARCHITECTURE_TH.md, CHANGELOG.md — ทั้งหมดภาษาไทย
+
+### ทราบปัญหา (Known Issues)
+- เวอร์ชันล่าสุดที่ parser ตรวจเจอ (เช่น PHP 8.6.0, MariaDB 13.1.1) อาจยังไม่อยู่ในแคตตาล็อกที่โปรแกรมรองรับ — ใช้เวอร์ชันจากแคตตาล็อกได้ทางหน้า "ติดตั้ง"
+- ไอคอนโปรแกรมยังเป็นไอคอนระบบ (จะทำไอคอนเฉพาะในเวอร์ชันหน้า)

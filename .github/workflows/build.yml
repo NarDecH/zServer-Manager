@@ -65,7 +65,7 @@ jobs:
         shell: pwsh
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/zserver-setup.iss'
 
-      - name: Create GitHub release
+      - name: Create GitHub release (draft — ตรวจเสร็จแล้วกด Publish บน GitHub เอง)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
@@ -76,6 +76,6 @@ jobs:
           gh release create $tag $exe `
             --title "zServer Manager $tag" `
             --notes "ดาวน์โหลด **Setup.exe** แล้วรัน (ต้องการสิทธิ์ admin) — ติดตั้งลง ``C:\zServer`` พร้อม shortcut และคู่มือภาษาไทย`n`nตัวโปรแกรมเป็น single-file self-contained (ไม่ต้องติดตั้ง .NET)`n`nคู่มือทั้งหมดอยู่ในโฟลเดอร์ docs\ หลังติดตั้ง หรืออ่านบน repo" `
-            --latest
+            --draft
 
   # ผู้ใช้อยาก release ด้วยมือก็รัน workflow นี้ด้วย workflow_dispatch + ใส่ tag ไว้แล้ว

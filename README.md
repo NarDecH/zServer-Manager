@@ -1,5 +1,9 @@
 # zServer Manager
 
+[![build](https://github.com/NarDecH/zServer-Manager/actions/workflows/build.yml/badge.svg)](https://github.com/NarDecH/zServer-Manager/actions/workflows/build.yml)
+[![release](https://img.shields.io/github/v/release/NarDecH/zServer-Manager?label=release&color=2ea44f)](https://github.com/NarDecH/zServer-Manager/releases)
+[![downloads](https://img.shields.io/github/downloads/NarDecH/zServer-Manager/total?label=downloads&color=blue)](https://github.com/NarDecH/zServer-Manager/releases)
+
 ![zServer Manager](docs/banner.png)
 
 โปรแกรมควบคุม Apache / PHP / MariaDB บน Windows ในที่เดียว — ติดตั้ง ตั้งค่า อัพเดท เปิด-ปิดเซอร์วิส

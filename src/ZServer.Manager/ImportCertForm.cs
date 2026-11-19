@@ -15,6 +15,7 @@ public sealed class ImportCertForm : Form
     private readonly Downloader _dl;
     private readonly StackController _stack;
     private readonly ConfigWriter _cw;
+    private readonly ToolTip _tips = new();
 
     private readonly TextBox _txtCertPath = new();
     private readonly TextBox _txtKeyPath = new();
@@ -35,8 +36,8 @@ public sealed class ImportCertForm : Form
         Text = "นำเข้าใบรับรองจริง (ซื้อมา) — .crt / .key / .pem / .pfx";
         Font = new Font("Segoe UI", 9.5f);
         StartPosition = FormStartPosition.CenterParent;
-        Size = new Size(760, 480);
-        MinimumSize = new Size(760, 480);
+        Size = new Size(780, 500);
+        MinimumSize = new Size(780, 500);
 
         var root = new TableLayoutPanel
         {
@@ -45,16 +46,23 @@ public sealed class ImportCertForm : Form
             RowCount = 5,
             Padding = new Padding(12),
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));   // cert
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));   // key
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));   // ca bundle
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 66));   // cert
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 66));   // key
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 66));   // ca bundle
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));   // key pass
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));   // state + buttons
 
-        root.Controls.Add(FileRow("ไฟล์ใบรับรอง (.crt/.pem/.cer) หรือ .pfx/.p12 ไฟล์เดียว", _txtCertPath, PickCert));
-        root.Controls.Add(FileRow("ไฟล์ private key (.key/.pem) — ถ้าเป็น .pfx เว้นว่างได้", _txtKeyPath, PickKey));
-        root.Controls.Add(FileRow("ไฟล์ CA bundle / intermediate (ถ้ามี — ทำให้ chain ครบ)", _txtCaBundle, PickBundle));
+        root.Controls.Add(FileRow(
+            "① ไฟล์ใบรับรอง (.crt/.pem/.cer) — หรือเลือก .pfx/.p12 ไฟล์เดียวก็ได้",
+            _txtCertPath, PickCert, "ไฟล์ .crt/.pem/.cer จากผู้ขาย หรือไฟล์ .pfx/.p12 ที่รวมทุกอย่างไว้แล้ว"));
+        root.Controls.Add(FileRow(
+            "② ไฟล์ private key (.key/.pem) — ถ้าใช้ .pfx ตรงข้างบน เว้นช่องนี้ว่างได้",
+            _txtKeyPath, PickKey, "ไฟล์ private key (.key/.pem) ที่คู่กับใบรับรอง"));
+        root.Controls.Add(FileRow(
+            "③ ไฟล์ CA bundle / intermediate (ถ้ามี — ทำให้ chain ครบ browser ไม่เตือน)",
+            _txtCaBundle, PickBundle, "ไฟล์ ca-bundle.crt / intermediate จากผู้ขาย (ถ้ามี)"));
 
+        // ---- รหัสผ่านของ key/pfx ----
         var passRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
         passRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 340));
         passRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -71,7 +79,8 @@ public sealed class ImportCertForm : Form
         passRow.Controls.Add(_txtKeyPass, 1, 0);
         root.Controls.Add(passRow);
 
-        var bottom = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true };
+        // ---- ปุ่ม + สถานะ ----
+        var bottom = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true, Padding = new Padding(2) };
         _btnImport.Click += (s, e) => Import();
         bottom.Controls.Add(_btnImport);
         bottom.Controls.Add(_lblState);
@@ -81,14 +90,29 @@ public sealed class ImportCertForm : Form
         Theme.Apply(this);
     }
 
-    private GroupBox FileRow(string title, TextBox txt, Action pick)
+    /// <summary>สร้างแถว "เลือกไฟล์": กดช่องหรือกดปุ่ม = เปิดหน้าเลือกไฟล์ทันที</summary>
+    private GroupBox FileRow(string title, TextBox txt, Action pick, string tip)
     {
         var g = new GroupBox { Text = " " + title + " ", Dock = DockStyle.Fill, Padding = new Padding(8, 2, 8, 4) };
-        txt.Dock = DockStyle.Fill;
-        txt.Margin = new Padding(0, 6, 0, 0);
-        g.Controls.Add(txt);
-        txt.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) pick(); };
-        g.DoubleClick += (s, e) => pick();
+        var lay = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
+        lay.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        lay.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
+
+        txt.ReadOnly = true;
+        txt.Cursor = Cursors.Hand;
+        txt.BackColor = Theme.InputBg;
+        txt.Margin = new Padding(0, 8, 0, 0);
+        txt.Text = "📄 กดเพื่อเลือกไฟล์…";
+        txt.Click += (s, e) => pick();
+        _tips.SetToolTip(txt, tip);
+
+        var btn = new Button { Text = "เลือกไฟล์…", Width = 130, Dock = DockStyle.Fill, Margin = new Padding(6, 8, 0, 0) };
+        btn.Click += (s, e) => pick();
+        _tips.SetToolTip(btn, tip);
+
+        lay.Controls.Add(txt, 0, 0);
+        lay.Controls.Add(btn, 1, 0);
+        g.Controls.Add(lay);
         return g;
     }
 
@@ -100,7 +124,14 @@ public sealed class ImportCertForm : Form
             Filter = "ใบรับรอง (*.crt;*.pem;*.cer;*.pfx;*.p12)|*.crt;*.pem;*.cer;*.pfx;*.p12|ทุกไฟล์|*.*",
             InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
         };
-        if (dlg.ShowDialog(this) == DialogResult.OK) _txtCertPath.Text = dlg.FileName;
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            _txtCertPath.Text = dlg.FileName;
+            _tips.SetToolTip(_txtCertPath, dlg.FileName);
+            // เลือก .pfx → เคลียร์ช่อง key เพราะใช้ไฟล์เดียวจบ
+            if (Regex.IsMatch(dlg.FileName, @"\.(pfx|p12)$", RegexOptions.IgnoreCase))
+                _txtKeyPath.Text = "— ใช้ไฟล์ .pfx เดียว (ไม่ต้องเลือก key) —";
+        }
     }
 
     private void PickKey()
@@ -111,7 +142,11 @@ public sealed class ImportCertForm : Form
             Filter = "Private key (*.key;*.pem)|*.key;*.pem|ทุกไฟล์|*.*",
             InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
         };
-        if (dlg.ShowDialog(this) == DialogResult.OK) _txtKeyPath.Text = dlg.FileName;
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            _txtKeyPath.Text = dlg.FileName;
+            _tips.SetToolTip(_txtKeyPath, dlg.FileName);
+        }
     }
 
     private void PickBundle()
@@ -122,15 +157,31 @@ public sealed class ImportCertForm : Form
             Filter = "CA bundle (*.crt;*.pem)|*.crt;*.pem|ทุกไฟล์|*.*",
             InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
         };
-        if (dlg.ShowDialog(this) == DialogResult.OK) _txtCaBundle.Text = dlg.FileName;
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            _txtCaBundle.Text = dlg.FileName;
+            _tips.SetToolTip(_txtCaBundle, dlg.FileName);
+        }
     }
+
+    private bool HasFile(TextBox txt) =>
+        txt.Text.Length > 0 && File.Exists(txt.Text);
 
     private async void Import()
     {
         var certPath = _txtCertPath.Text.Trim();
-        if (!File.Exists(certPath))
+        if (!HasFile(_txtCertPath))
         {
-            MessageBox.Show("เลือกไฟล์ใบรับรองก่อน (กดดับเบิลคลิกที่ช่องเพื่อเลือกไฟล์)", "ตรวจสอบ",
+            MessageBox.Show("เลือกไฟล์ใบรับรองก่อน (กดที่ช่อง ① หรือปุ่ม \"เลือกไฟล์…\")", "ตรวจสอบ",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var isPfx = Regex.IsMatch(certPath, @"\.(pfx|p12)$", RegexOptions.IgnoreCase);
+        var keyPath = _txtKeyPath.Text.Trim();
+        if (!isPfx && !HasFile(_txtKeyPath))
+        {
+            MessageBox.Show("เลือกไฟล์ private key (.key) ด้วย — หรือใช้ไฟล์ .pfx ไฟล์เดียวแทน", "ตรวจสอบ",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
@@ -140,18 +191,10 @@ public sealed class ImportCertForm : Form
         UseWaitCursor = true;
         try
         {
-            var keyPath = _txtKeyPath.Text.Trim();
-            if (string.IsNullOrEmpty(keyPath) && !Regex.IsMatch(certPath, @"\.(pfx|p12)$", RegexOptions.IgnoreCase))
-            {
-                MessageBox.Show("ยังไม่ได้เลือกไฟล์ private key (.key)", "ตรวจสอบ",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
             var result = await Task.Run(() => HttpsHelper.ImportCommercialCert(
                 _paths, _log, certPath,
-                keyPath.Length > 0 ? keyPath : null,
-                _txtCaBundle.Text.Trim().Length > 0 ? _txtCaBundle.Text.Trim() : null,
+                isPfx ? null : keyPath,
+                HasFile(_txtCaBundle) ? _txtCaBundle.Text.Trim() : null,
                 _txtKeyPass.Text.Length > 0 ? _txtKeyPass.Text : null));
 
             if (result.Info == null)
@@ -160,14 +203,14 @@ public sealed class ImportCertForm : Form
             _lblState.Text = $"นำเข้าสำเร็จ ✓ {result.Info.Subject} — หมดอายุ {result.Info.NotAfter}";
             _log.Info($"นำเข้าใบรับรองจริงสำเร็จ: {result.Info.Subject} ครอบคลุม {string.Join(", ", result.Info.Domains)}");
 
-            var chainNote = string.IsNullOrWhiteSpace(_txtCaBundle.Text) && !Regex.IsMatch(certPath, @"\.(pfx|p12)$", RegexOptions.IgnoreCase)
+            var chainNote = !HasFile(_txtCaBundle) && !isPfx
                 ? "\n\n⚠ ไม่ได้ใส่ CA bundle — บาง browser/มือถืออาจเตือน chain ไม่ครบ (ขอไฟล์ ca-bundle จากผู้ขายแล้วนำเข้าอีกครั้งเพื่อแก้)"
                 : "";
 
             var msg = $"นำเข้าใบรับรองจริงสำเร็จ ✓\n\n" +
                       $"Subject: {result.Info.Subject}\n" +
                       $"หมดอายุ: {result.Info.NotAfter}\n" +
-                      $"โดเมน: {string.Join(", ", result.Info.Domains)}" + chainNote +
+                      $"โดเมน: {(result.Info.Domains.Length > 0 ? string.Join(", ", result.Info.Domains) : "(ตามใบรับรอง)")}" + chainNote +
                       $"\n\nเปิด HTTPS และรีสตาร์ท Apache เดี๋ยวนี้ไหม?";
 
             if (MessageBox.Show(msg, "นำเข้าสำเร็จ", MessageBoxButtons.YesNo,

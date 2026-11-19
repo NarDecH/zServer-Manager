@@ -17,9 +17,10 @@ tasklist | findstr <PID ที่เจอ>
 **วิธีแก้** — เลือกอย่างใดอย่างหนึ่ง:
 1. หยุดโปรแกรมเดิมที่ใช้พอร์ต (XAMPP Control Panel → Stop หรือ `sc stop Apache2.4`)
 2. เปลี่ยนพอร์ตของ zServer: หน้า **ตั้งค่า** → Apache = 8080 / MariaDB = 3307 → บันทึก → รีสตาร์ทเซอร์วิส
-3. ตั้ง XAMPP ไม่ให้ auto-start: `sc config Apache2.4 start= demand`
+3. ตอน**ติดตั้ง**คอมโพเนนต์ถ้าพอร์ตชน โปรแกรมจะถาม 3 ทางเลือก — เลือก **"ไม่ใช่" = เปลี่ยนเป็นพอร์ตว่างอัตโนมัติแล้วติดตั้งต่อ** ได้เลย (โปรแกรมหาพอร์ตว่าง + เขียน config ให้)
+4. ตั้ง XAMPP ไม่ให้ auto-start: `sc config Apache2.4 start= demand`
 
-> โปรแกรมตรวจพอร์ตก่อนเริ่มเซอร์วิสทุกครั้ง ดังนั้นถ้าพอร์ตชนจะไม่เริ่มเองพร้อมกับแจ้งผู้ร้าวชัดเจน
+> โปรแกรมตรวจพอร์ตก่อนเริ่มเซอร์วิสทุกครั้ง ดังนั้นถ้าพอร์ตชนจะไม่เริ่มเองพร้อมกับแจ้งผู้ใช้ชัดเจน
 
 ---
 
@@ -31,10 +32,11 @@ tasklist | findstr <PID ที่เจอ>
    ```
    C:\zServer\apache\bin\httpd.exe -t -d "C:\zServer\apache" -f "C:\zServer\apache\conf\httpd.conf"
    ```
-3. **(HTTP No Listening)** หรือ `(OS 10048) make_sock: could not bind to address` = พอร์ตชน (ดูหัวข้อแรก)
+3. **(OS 10048) make_sock: could not bind to address** = พอร์ตชน (ดูหัวข้อแรก)
 4. ข้อความ `Cannot load .../php8apache2_4.dll` = PHP ตัวที่ติดตั้งไม่ใช่รุ่น Thread Safe → ติดตั้ง PHP ใหม่จากหน้า "ติดตั้ง" (โปรแกรมเลือกรุ่น TS ให้แล้ว)
-5. ข้อความ `api-ms-win-crt...dll missing` หรือขึ้น error เกี่ยวกับ VCRUNTIME140.dll = ยังไม่ติดตั้ง VC++ Redistributable → หน้า "ติดตั้ง" → กดปุ่มติดตั้ง VC++ Redistributable → รีสตาร์ทเครื่องหลังติดตั้ง
+5. ข้อความ `api-ms-win-crt...dll missing` หรือ error เกี่ยวกับ VCRUNTIME140.dll = ยังไม่ติดตั้ง VC++ Redistributable → หน้า "ติดตั้ง" → กดปุ่มติดตั้ง VC++ Redistributable → รีสตาร์ทเครื่องหลังติดตั้ง
 6. แก้ config เองแล้วพัง: เอาไฟล์สำรองใน `backups\configs\httpd.conf.*.bak` กลับมาทับ แล้วรีสตาร์ท
+7. หลังเปิด HTTPS: `Cannot define multiple Listeners on the same IP:port` = ใช้ config รอบเก่า — config ใหม่ของโปรแกรม (v1.4.0+) แก้แล้ว กดบันทึกหน้าตั้งค่าหรือติดตั้งใหม่หนึ่งครั้ง
 
 ---
 
@@ -42,26 +44,81 @@ tasklist | findstr <PID ที่เจอ>
 
 1. เปิด `logs\mariadb-error.log` — บรรทัดท้ายสุดมักบอกสาเหตุตรง ๆ
 2. `Can't open .../my.ini` = ไฟล์ my.ini หาย → เปิดหน้า ตั้งค่า → กดบันทึก (โปรแกรมสร้างให้ใหม่) หรือติดตั้ง MariaDB ใหม่
-3. `[ERROR] ... InnoDB: ... ibdata1` = ไฟล์ข้อมูลพัง/หาย — ถ้ายังไม่มีข้อมูลสำคัญ ลบโฟลเดอร์ `data\` แล้วรัน `mariadb\bin\mariadb-install-db.exe --datadir="C:\zServer\data"` ใหม่; ถ้ามีข้อมูลสำคัญ **ห้ามลบ** — ติดตั้ง MariaDB เวอร์ชันเดิมจาก `backups\mariadb-old-...` กลับ
-4. เริ่มผ่าน service ไม่ได้แต่เริ่มโหมด process ได้ = เซอร์วิสลงทะเบียน path ผิด (เช่นหลังย้ายโฟลเดอร์) → ตั้งค่า → เซอร์วิส → ถอนเซอร์วิส MariaDB แล้วกดติดตั้งใหม่
+3. `[ERROR] ... unknown variable 'log_timestamps'` = ใช้ config รอบเก่า (v1.3.0 ลงไป) — my.ini ใหม่แก้แล้ว: กดบันทึกหน้าตั้งค่าหนึ่งครั้ง
+4. `[ERROR] ... InnoDB: ... ibdata1` = ไฟล์ข้อมูลพัง/หาย — ถ้ายังไม่มีข้อมูลสำคัญ ลบโฟลเดอร์ `data\` แล้วรัน `mariadb\bin\mariadb-install-db.exe --datadir="C:\zServer\data"` ใหม่; ถ้ามีข้อมูลสำคัญ **ห้ามลบ** — ติดตั้ง MariaDB เวอร์ชันเดิมจาก `backups\mariadb-old-...` กลับ
+5. เริ่มผ่าน service ไม่ได้แต่เริ่มโหมด process ได้ = เซอร์วิสลงทะเบียน path ผิด (เช่นหลังย้ายโฟลเดอร์) → ตั้งค่า → เซอร์วิส → ถอนเซอร์วิส MariaDB แล้วกดติดตั้งใหม่
 
 ---
 
-## เว็บเปิดได้แต่หน้า PHP ขึ้นดาวน์โหลดไฟล์ / ขึ้น source code
+## HTTPS / ใบรับรอง
 
-= Apache ยังไม่โหลดโมดูล PHP ตรวจว่า `httpd.conf` มีบรรทัดเหล่านี้:
-```
-LoadModule php_module "C:/zServer/php/php8apache2_4.dll"
-PHPIniDir "C:/zServer/php"
-AddHandler application/x-httpd-php .php
-```
-ถ้าไม่มี = PHP ยังไม่ได้ติดตั้งหรือไม่ใช่รุ่น TS — ติดตั้ง PHP จากหน้า "ติดตั้ง" แล้วโปรแกรมจะใส่ให้เอง
+### เปิด HTTPS แล้ว Apache start ไม่ได้
+1. รัน `httpd -t` (คำสั่งในหัวข้อ Apache) — ดู error จริง
+2. `Cannot define multiple Listeners` = config รอบเก่า (v1.3.0 ลงไป) — v1.4.0+ แก้แล้ว กดบันทึกหน้าตั้งค่าหรือติดตั้งใหม่
+3. `SSLCertificateFile: file ... does not exist` = เปิด HTTPS ทั้งที่ยังไม่มีใบรับรอง — เปิดหน้า **HTTPS** → กด "① สร้าง / ต่ออายุใบรับรอง" ก่อน (โปรแกรม v1.4.0+ จะไม่ยอมเขียน config https ถ้าไฟล์ไม่มีจริง)
+
+### browser ขึ้น "ไม่ปลอดภัย" ทั้งที่ใช้ mkcert
+- mkcert CA ต้องติดตั้งเข้า Windows trust store — โปรแกรม v1.4.0+ ทำผ่าน `certutil -addstore Root` ให้อัตโนมัติตอนกด "① สร้างใบรับรอง"
+- ถ้ายังเตือน: รีสตาร์ท browser (Chrome/Edge cache state) หรือรีสตาร์ทเครื่องหนึ่งครั้ง
+- Firefox ใช้ trust store ของตัวเอง — เพิ่ม CA เองที่ Firefox → Settings → Certificates → Import `%LOCALAPPDATA%\mkcert\rootCA.pem`
+
+### ใช้ใบรับรองจริงที่ซื้อมา
+- หน้า **HTTPS** → ปุ่ม **"นำเข้าใบรับรองจริงที่ซื้อมา (.crt/.key/.pfx)"**
+- ใส่ได้ทั้งแบบ 2 ไฟล์ (.crt + .key) หรือ .pfx/.p12 ไฟล์เดียว (+รหัสผ่าน)
+- โปรแกรมตรวจ **key ตรงกับ cert** ให้อัตโนมัติ (key ผิดจะบอกทันที)
+- ไม่ใส่ CA bundle → บาง browser/มือถืออาจเตือน chain ไม่ครบ — ขอไฟล์ ca-bundle จากผู้ขายแล้วนำเข้าซ้ำ
+- ใบรับรองต้องครอบคลุมโดเมนที่ใช้ — ดูในแถว "ครอบคลุม: ..." หลังนำเข้า (ถ้าโดเมนใหม่ที่เพิ่มเป็น vhost ทีหลัง กดสร้าง/ต่ออายุซ้ำเพื่อเพิ่ม SAN)
+
+### HTTPS เปิดแล้วแต่ https://localhost เข้าไม่ได้
+1. `netstat -ano | findstr ":443"` — ต้องเห็น LISTENING
+2. Firewall บล็อก? → หน้า HTTPS → ปุ่มเปิดพอร์ต Firewall (หรือกดปุ่ม Firewall รวมบนหน้าหลัก)
+3. เว็บเพื่อนใน LAN เข้าไม่ได้แต่ localhost ได้ = firewall — เปิดพอร์ต 443 ด้วย
 
 ---
 
-## PHP เว็บขึ้น 500 / fatal error เรื่อง extension
+## นำเข้าใบรับรองจริงไม่สำเร็จ
 
-เช่น `Uncaught Error: Call to undefined function mysqli_connect()` = extension ที่ต้องใช้ยังปิดอยู่ → หน้า ตั้งค่า → PHP → เปิด extension ที่ต้องการ (mysqli, mbstring ฯลฯ) → บันทึก → รีสตาร์ท Apache
+| ข้อความ | สาเหตุ / วิธีแก้ |
+|---|---|
+| `อ่านไฟล์ใบรับรองไม่สำเร็จ (ลองทั้ง PEM และ DER)` | ไฟล์ไม่ใช่ใบรับรองจริง หรือเสียหาย — เปิดด้วย notepad ดูว่าขึ้นต้น `-----BEGIN CERTIFICATE-----` |
+| `อ่าน private key ไม่สำเร็จ (เช็ครหัสผ่านของ key)` | รหัสผ่าน key ผิด หรือไฟล์ไม่ใช่ key — ไฟล์ key ต้องขึ้นต้น `-----BEGIN PRIVATE KEY-----` หรือ `-----BEGIN RSA PRIVATE KEY-----` |
+| `private key ไม่ตรงกับใบรับรอง (public key ต่างกัน)` | หยิบไฟล์คนละคู่ — cert กับ key ต้องมาจาก CSR เดียวกัน |
+| `ไม่พบ openssl.exe (ต้องติดตั้ง Apache ก่อน)` | โปรแกรมใช้ openssl ที่มากับ Apache — ติดตั้ง Apache ก่อน จึงนำเข้า cert ได้ |
+| นำเข้าแล้ว browser ยังเตือน chain | ใส่ไฟล์ CA bundle/intermediate ที่ผู้ขายให้ แล้วนำเข้าซ้ำ (โปรแกรมต่อท้าย cert ให้เอง) |
+
+---
+
+## PHP หลายเวอร์ชัน / สลับเวอร์ชัน
+
+**ตรวจระบบปัจจุบัน:**
+```
+dir C:\zServer\php-versions\          (เวอร์ชันที่เก็บไว้)
+dir C:\zServer\php /a                 (ต้องขึ้น <JUNCTION> ถ้าใช้ระบบเวอร์ชัน)
+C:\zServer\php\php.exe -v             (เวอร์ชัน active)
+```
+
+- dropdown ในแท็บ PHP ไม่มีเวอร์ชัน = ยังไม่เคยติดตั้ง PHP ผ่านโปรแกรม — ติดตั้งผ่านหน้า "ติดตั้ง" ก่อน (โปรแกรมจะย้าย php\ เดิมเข้าระบบให้เอง)
+- สลับแล้ว Apache พัง = config ค้างรุ่นเก่า — กดบันทึกหน้าตั้งค่าหนึ่งครั้ง (เขียน config ใหม่) แล้วรีสตาร์ท
+- `php\ ยังเป็นโฟลเดอร์จริงอยู่ (ย้ายเข้าระบบหลายเวอร์ชันไม่สำเร็จ)` = มีโปรแกรมจับไฟล์ php อยู่ (เช่น Apache ยังรัน) — หยุด Apache แล้วสลับใหม่
+
+---
+
+## สำรองฐานข้อมูลอัตโนมัติไม่ทำงาน
+
+1. ตรวจว่าเปิดไว้: ตั้งค่า → MariaDB → ☑ เปิดสำรองอัตโนมัติ + เวลาถูกต้อง (HH:mm)
+2. โปรแกรมต้อง**เปิดค้างไว้**ตอนถึงเวลา (backup ทำโดยโปรแกรม ไม่ใช่ Windows service)
+3. MariaDB ต้อง RUNNING ตอนถึงเวลา
+4. ถ้า root มีรหัสผ่าน ต้องบันทึกรหัสผ่านไว้ในหน้าตั้งค่าด้วย (เข้ารหัส DPAPI) — ดูแถว "รหัสผ่าน root (งานอัตโนมัติ)" ว่า "บันทึกไว้แล้ว ✓"
+5. ตรวจ log: `logs\zserver-manager.log` หา "สำรองอัตโนมัติ"
+6. ไฟล์สำรองอยู่ที่ `backups\databases\*.sql`
+
+---
+
+## Watchdog แจ้งผิด ๆ / ไม่แจ้ง
+
+- Watchdog ไม่นับตอนผู้ใช้กดหยุด/รีสตาร์ทเองผ่านโปรแกรม (มีระบบ suppress)
+- แจ้งไม่หยุด = ปิดได้ที่ ตั้งค่า → ทั่วไป → ☐ Watchdog
+- ต้องการ auto-restart = ติ๊ก ☑ Watchdog (โปรแกรมจะเริ่มให้ใหม่ + balloon แจ้ง)
 
 ---
 
@@ -70,6 +127,15 @@ AddHandler application/x-httpd-php .php
 - โปรแกรมต้องรันแบบ Administrator — ดับเบิลคลิก exe แล้วกด "ใช่" ที่ UAC ทุกครั้ง
 - ถ้าชื่อเซอร์วิสซ้ำกับของเดิม (เช่นเคยลงแล้ว) → ตั้งค่า → เซอร์วิส → ถอนเซอร์วิสก่อน แล้วติดตั้งใหม่
 - เซอร์วิสค้าง "Starting..." → `sc query ZServerApache` ดูสถานะ, ลอง `sc stop` + เริ่มใหม่, ถ้ายังค้าง `sc delete <ชื่อ>` แล้วติดตั้งใหม่จากหน้าตั้งค่า
+
+---
+
+## เปิดโปรแกรมอัตโนมัติตอนเปิดเครื่อง ไม่ทำงาน
+
+1. ตรวจว่า task ถูกสร้าง: เปิด **taskschd.msc** หา task ชื่อ `ZServerManager`
+2. ตรวจว่าเปิดให้รัน: คลิกขวา task → Run (ทดสอบ)
+3. task ที่สร้างเป็นแบบ "run only when user is logged on" — ต้อง logon ถึงจะเปิดโปรแกรม (ตามดีไซน์ เพราะเป็น GUI)
+4. ลบ task แล้วสร้างใหม่: ปิดตัวเลือก → บันทึก → เปิดใหม่ → บันทึก (โปรแกรม sync ให้เอง)
 
 ---
 
@@ -84,7 +150,7 @@ AddHandler application/x-httpd-php .php
 
 ## อัพโหลดไฟล์ใหญ่ไม่ผ่าน
 
-เพิ่ม 3 ค่าในหน้า ตั้งค่า → PHP: `upload_max_filesize`, `post_max_size` (และถ้าใช้ nginx หน้าบ้านไม่เกี่ยว ที่นี่ใช้ Apache) แล้วรีสตาร์ท Apache ขีดจำกัดในโค้ดของเว็บ (เช่น WordPress) ต้องเพิ่มด้วย
+เพิ่มค่าในหน้า ตั้งค่า → PHP: `upload_max_filesize`, `post_max_size` แล้วรีสตาร์ท Apache ขีดจำกัดในโค้ดของเว็บ (เช่น WordPress) ต้องเพิ่มด้วย
 
 ---
 
@@ -97,11 +163,12 @@ AddHandler application/x-httpd-php .php
 ## เชื่อมต่อฐานข้อมูลจากเว็บไม่ได้ (connection refused)
 
 1. การ์ด MariaDB ต้องเป็น ● กำลังทำงาน
-2. โค้ด PHP ต้องใช้ `host=127.0.0.1` (หรือ localhost), `port=3306`, `user=root`, `password=` ตามที่ตั้งไว้
+2. **`bind-address = 127.0.0.1`** ทำให้เครื่องอื่นเข้าไม่ได้ (ตามค่าเริ่มต้นปลอดภัย) — โค้ดบนเครื่องเดียวกันใช้ `127.0.0.1` ได้ปกติ
+3. โค้ด PHP:
    ```php
-   $db = mysqli_connect("127.0.0.1", "root", "", "mydb", 3306);
+   $db = mysqli_connect("127.0.0.1", "user", "pass", "mydb", 3306);
    ```
-3. ถ้าตั้งรหัสผ่าน root แล้วลืม: แก้ผ่าน `mariadb\bin\mariadb.exe --port=3306 -u root -p` หรือรีเซ็ตด้วยการลบ datadir (สูญข้อมูล!) จึงควรจดรหัสผ่านไว้
+4. ถ้าตั้งรหัสผ่าน root แล้วลืม: รีเซ็ตผ่านหน้าตั้งค่า → ตั้งรหัสผ่าน root (ใส่รหัสเดิมช่อง "รหัสเดิม")
 
 ---
 
@@ -117,29 +184,38 @@ AddHandler application/x-httpd-php .php
 
 - อินเทอร์เน็ตหลุดกลางทาง → ลองใหม่ (ไฟล์เก่า .part ถูกลบให้อัตโนมัติ)
 - SHA256 ไม่ผ่าน = ไฟล์ที่โหลดเสียหายหรือถูกแก้ไข โปรแกรมจะทิ้งไฟล์นั้นให้เองและไม่ติดตั้ง — ลองใหม่ ถ้าซ้ำลบไฟล์ zip เก่าใน `downloads\` แล้วลองอีกครั้ง
-- เว็บปลายทางเปลี่ยน URL → อัพเดทโปรแกรมเวอร์ชันใหม่ (แคตตาล็อกอยู่ใน `src\ZServer.Core\VersionCatalog.cs`)
+- เว็บปลายทางเปลี่ยน URL → รายการเวอร์ชันถูกดึงจากเว็บสดอยู่แล้ว (v1.1.0+) ถ้ายังไม่ได้ ใช้ `RemoteCatalogUrl` ใส่ URL เองได้
+
+---
+
+## ไฟล์ config เปิดด้วย Notepad แล้วติดกันเป็นบรรทัดเดียว
+
+= ไฟล์รอบเก่าเป็น LF — โปรแกรม v1.4.0+ เขียนใหม่เป็น CRLF แล้ว: กดบันทึกหน้าตั้งค่าหนึ่งครั้ง (เขียน config ใหม่ทุกไฟล์) หรือหน้า "แก้ไขไฟล์ Config" จะแปลงให้อัตโนมัติตอนแสดงผล
 
 ---
 
 ## ระบบกลับคืน (Rollback) หลังอัพเดทแล้วมีปัญหา
 
 1. หยุดเซอร์วิสที่เกี่ยวข้อง
-2. ลบโฟลเดอร์ใหม่ (`apache\` / `php\` / `mariadb\`)
-3. ย้ายโฟลเดอร์สำรองจาก `backups\<ชื่อ>-old-<วันเวลา>\` กลับมาใช้ชื่อเดิม (`apache\` เป็นต้น)
+2. ลบโฟลเดอร์ใหม่ (`apache\` / `php\` / `mariadb\`) — ถ้า php เป็น junction ลบ junction (ไม่ลบ php-versions)
+3. ย้ายโฟลเดอร์สำรองจาก `backups\<ชื่อ>-old-<วันเวลา>\` กลับมาใช้ชื่อเดิม
 4. config เดิมอยู่ใน `backups\configs\` — กลับไฟล์ที่ต้องการ
 5. เริ่มเซอร์วิส / หรือเปิดโปรแกรมแล้วกดเริ่ม
 
 ---
 
-## ตรวจสุขภาพระบบทั้งหมดในหนึ่งคำสั่ง
+## ตรวจสุขภาพระบบทั้งหมดในหนึ่งชุดคำสั่ง
 
 ```bat
 :: Apache config
 C:\zServer\apache\bin\httpd.exe -t -d "C:\zServer\apache" -f "C:\zServer\apache\conf\httpd.conf"
 
-:: PHP
+:: PHP (เวอร์ชัน active)
 C:\zServer\php\php.exe -v
 C:\zServer\php\php.exe -m   (รายการ extension ที่โหลดได้)
+
+:: PHP เวอร์ชันที่เก็บไว้ทั้งหมด
+dir C:\zServer\php-versions\
 
 :: MariaDB
 C:\zServer\mariadb\bin\mariadb.exe --port=3306 -u root -p -e "SELECT VERSION();"
@@ -149,5 +225,8 @@ sc query ZServerApache
 sc query ZServerMariaDB
 
 :: พอร์ต
-netstat -ano | findstr ":80 :3306"
+netstat -ano | findstr ":80 :443 :3306"
+
+:: ใบรับรอง HTTPS
+C:\zServer\apache\bin\openssl.exe x509 -in C:\zServer\apache\conf\ssl\cert.pem -noout -subject -enddate -ext subjectAltName
 ```

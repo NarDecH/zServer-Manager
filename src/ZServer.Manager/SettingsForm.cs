@@ -59,6 +59,7 @@ public sealed class SettingsForm : Form
     private readonly Button _btnBackupNow = new() { Text = "สำรองเดี๋ยวนี้" };
     private readonly Button _btnOpenBackupFolder = new() { Text = "เปิดโฟลเดอร์สำรอง" };
     private readonly Label _lblBackupState = new() { AutoSize = true, ForeColor = Color.DimGray, Padding = new Padding(6, 8, 0, 0) };
+    private readonly Button _btnUpgradeTables = new() { Text = "อัพเกรดตารางระบบ (mariadb-upgrade)", Width = 280 };
     private readonly TextBox _txtRootPass = new() { UseSystemPasswordChar = true, Width = 220 };
     private readonly Label _lblRootPassState = new() { AutoSize = true, ForeColor = Color.DimGray, Padding = new Padding(6, 8, 0, 0) };
     private readonly TextBox _txtDataDir = new() { ReadOnly = true, BackColor = Color.Gainsboro };
@@ -203,6 +204,7 @@ public sealed class SettingsForm : Form
         AddRow(layout3, "การเข้าถึง", _chkBindLocal);
         AddRow(layout3, "สำรองข้อมูลอัตโนมัติ", Wrap(_chkAutoBackup, new Label { Text = "เวลา:", AutoSize = true, Padding = new Padding(6, 8, 0, 0) }, _txtBackupTime, new Label { Text = "เก็บ (วัน):", AutoSize = true, Padding = new Padding(6, 8, 0, 0) }, _numBackupRetention));
         AddRow(layout3, "ทำสำรองเดี๋ยวนี้", Wrap(_btnBackupNow, _btnOpenBackupFolder, _lblBackupState));
+        AddRow(layout3, "หลังอัพเดทเวอร์ชัน MariaDB", _btnUpgradeTables);
         AddRow(layout3, "รหัสผ่าน root (งานอัตโนมัติ)", Wrap(_txtRootPass, _lblRootPassState));
         AddRow(layout3, "โฟลเดอร์ข้อมูล (datadir) — ไม่ควรเปลี่ยน", _txtDataDir);
         AddRow(layout3, "character-set-server", _cboCharset);
@@ -273,6 +275,7 @@ public sealed class SettingsForm : Form
             if (_clbVhosts.SelectedIndex >= 0) _clbVhosts.Items.RemoveAt(_clbVhosts.SelectedIndex);
         };
         _btnBackupNow.Click += (s, e) => BackupNow();
+        _btnUpgradeTables.Click += (s, e) => UpgradeTables();
         _btnOpenBackupFolder.Click += (s, e) =>
         {
             var dir = Path.Combine(_paths.BackupsDir, "databases");
@@ -800,6 +803,67 @@ public sealed class SettingsForm : Form
         finally
         {
             _btnSwitchPhp.Enabled = true;
+            UseWaitCursor = false;
+        }
+    }
+
+    // ================= อัพเกรดตารางระบบ (mariadb-upgrade) =================
+    private async void UpgradeTables()
+    {
+        if (!File.Exists(_paths.MariaDbBin))
+        {
+            MessageBox.Show("ยังไม่ได้ติดตั้ง MariaDB", "ตรวจสอบ",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var stack = new StackController(_paths, _cfg, _log);
+        var running = stack.GetMariaDbStatus().State == ComponentState.Running;
+        if (!running)
+        {
+            if (MessageBox.Show("MariaDB ยังไม่ทำงานอยู่ — เริ่มก่อนแล้วอัพเกรดตารางระบบต่อไหม?",
+                "ตรวจสอบ", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                RunQuiet(stack.StartMariaDb);
+                await Task.Delay(1500);
+            }
+            else return;
+        }
+
+        if (MessageBox.Show(
+            "รัน mariadb-upgrade เพื่ออัพเกรดตารางระบบ?\n\n" +
+            "ทำเมื่อ: เพิ่งอัพเดท MariaDB ข้ามเวอร์ชัน (เช่น 11.4 → 11.8)\n" +
+            "ใช้เวลา: ไม่กี่วินาที–นาที (ขึ้นกับขนาดข้อมูล)\n" +
+            "แนะนำ: กด \"สำรองเดี๋ยวนี้\" ก่อนหน้านี้หนึ่งครั้ง",
+            "ยืนยัน", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
+
+        _btnUpgradeTables.Enabled = false;
+        _lblBackupState.Text = "กำลังอัพเกรดตารางระบบ…";
+        UseWaitCursor = true;
+        try
+        {
+            var db = new MariaDbManager(_paths, _cfg, _log, _dl);
+            var (code, output) = await Task.Run(() => db.RunUpgrade());
+            if (code != 0)
+                throw new InvalidOperationException(output.Length > 1200 ? output[..1200] + "…" : output);
+
+            _log.Info("mariadb-upgrade สำเร็จ");
+            _lblBackupState.Text = "อัพเกรดตารางระบบสำเร็จ ✓";
+            var tail = output.Length > 800 ? "…" + output[^800..] : output;
+            MessageBox.Show("อัพเกรดตารางระบบสำเร็จ ✓\n\n" + tail,
+                "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            _log.Error("mariadb-upgrade ล้มเหลว: " + ex.Message);
+            _lblBackupState.Text = "อัพเกรดไม่สำเร็จ";
+            MessageBox.Show("อัพเกรดตารางระบบไม่สำเร็จ:\n" + ex.Message, "ผิดพลาด",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        finally
+        {
+            _btnUpgradeTables.Enabled = true;
             UseWaitCursor = false;
         }
     }

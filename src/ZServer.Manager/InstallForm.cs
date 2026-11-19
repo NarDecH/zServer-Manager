@@ -373,6 +373,7 @@ public sealed class InstallForm : Form
     {
         var item = SelectedItem(cbo);
         if (item == null) return;
+        var wasMariaDbInstalled = component == "mariadb" && _cfg.MariaDbInstalled != null;
 
         // เตือนพอร์ตก่อนเริ่ม (Apache/MariaDB) — พร้อมเสนอพอร์ตว่างอัตโนมัติ
         var port = component == "apache" ? _cfg.Apache.Port : component == "mariadb" ? _cfg.MariaDb.Port : 0;
@@ -487,6 +488,39 @@ public sealed class InstallForm : Form
                 }
             }
             catch { /* MariaDB ยังไม่เริ่ม — ข้าม */ }
+
+            // ---- ติดตั้ง "ทับ" เวอร์ชันเดิม → แนะนำรัน mariadb-upgrade ----
+            if (wasMariaDbInstalled)
+            {
+                try
+                {
+                    var upDb = new MariaDbManager(_paths, _cfg, _log, _dl);
+                    var (upCheckCode, _) = upDb.RunSql("SELECT 1");
+                    if (upCheckCode == 0 && MessageBox.Show(
+                        "ติดตั้ง MariaDB ทับเวอร์ชันเดิม — แนะนำรัน mariadb-upgrade (อัพเกรดตารางระบบ) หนึ่งครั้ง\n" +
+                        "ใช้เวลาไม่กี่วินาที–นาที ดำเนินการต่อไหม?",
+                        "mariadb-upgrade", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                    {
+                        var (upgCode, upgOutput) = upDb.RunUpgrade();
+                        if (upgCode == 0)
+                        {
+                            _log.Info("mariadb-upgrade สำเร็จ (หลังติดตั้งทับ)");
+                            MessageBox.Show("อัพเกรดตารางระบบสำเร็จ ✓", "สำเร็จ",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                        else
+                        {
+                            MessageBox.Show("อัพเกรดตารางระบบไม่สำเร็จ:\n" + upgOutput, "ผิดพลาด",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    }
+                }
+                catch (Exception upEx)
+                {
+                    MessageBox.Show("mariadb-upgrade ไม่สำเร็จ:\n" + upEx.Message, "ผิดพลาด",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
         }
     }
 

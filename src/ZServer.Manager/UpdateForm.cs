@@ -205,6 +205,30 @@ public sealed class UpdateForm : Form
             };
             await mgr.InstallAsync(target, progress, installService: _cfg.Services.Mode == "service");
             _txtLog.AppendText($"✓ อัพเดท {target.DisplayName} เป็นเวอร์ชัน {target.Version} เสร็จ" + Environment.NewLine);
+
+            // ---- MariaDB: แนะนำรัน mariadb-upgrade ทันทีหลังอัพเดท ----
+            if (component == "mariadb" && MessageBox.Show(
+                "อัพเดท MariaDB เสร็จ — แนะนำรัน mariadb-upgrade (อัพเกรดตารางระบบ) ทันที\n" +
+                "โปรแกรมจะเริ่ม MariaDB + รันอัพเกรดให้ (ใช้เวลาไม่กี่วินาที–นาที)\n\nดำเนินการต่อไหม?",
+                "mariadb-upgrade", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                var upStack = new StackController(_paths, _cfg, _log);
+                upStack.StartMariaDb();
+                var upDb = new MariaDbManager(_paths, _cfg, _log, _dl);
+                var (upCode, upOutput) = await Task.Run(() => upDb.RunUpgrade());
+                if (upCode == 0)
+                {
+                    _txtLog.AppendText("✓ mariadb-upgrade สำเร็จ" + Environment.NewLine);
+                    MessageBox.Show("อัพเกรดตารางระบบสำเร็จ ✓ — ฐานข้อมูลพร้อมใช้กับเวอร์ชันใหม่แล้ว",
+                        "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    _txtLog.AppendText("✗ mariadb-upgrade: " + upOutput + Environment.NewLine);
+                    MessageBox.Show("อัพเกรดตารางระบบไม่สำเร็จ:\n" + upOutput, "ผิดพลาด",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
         }
         catch (Exception ex)
         {

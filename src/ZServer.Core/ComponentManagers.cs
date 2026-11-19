@@ -484,6 +484,25 @@ public sealed class MariaDbManager : ComponentManager
         return outFilePath;
     }
 
+    /// <summary>
+    /// รัน mariadb-upgrade — อัพเกรดตารางระบบหลังอัพเดท MariaDB ข้ามเวอร์ชัน
+    /// (ต้องเริ่ม MariaDB ก่อน; ใช้เวลาไม่กี่วินาที–นาทีขึ้นกับขนาดข้อมูล)
+    /// </summary>
+    public (int Code, string Output) RunUpgrade(string? rootPassword = null)
+    {
+        var upExe = Path.Combine(P.MariaDbDir, "bin", "mariadb-upgrade.exe");
+        if (!File.Exists(upExe))
+            throw new InvalidOperationException("ไม่พบ mariadb-upgrade.exe ในโฟลเดอร์ bin");
+
+        var pass = rootPassword ?? StoredPassword();
+        var args = $"--port={C.MariaDb.Port} --protocol=TCP -u root";
+        if (!string.IsNullOrEmpty(pass))
+            args += $" --password=\"{pass.Replace("\"", "\\\"")}\"";
+
+        var (code, stdout, stderr) = ProcessRunner.Run(upExe, args, P.MariaDbDir, 600_000);
+        return (code, (stdout + stderr).Trim());
+    }
+
     public void SetRootPassword(string newPassword, string? oldPassword = null)
     {
         var sql = string.IsNullOrEmpty(newPassword)

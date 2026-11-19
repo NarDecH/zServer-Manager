@@ -23,7 +23,8 @@ public sealed class HttpsManagerForm : Form
     private readonly Label _lblHttps = new() { AutoSize = true, ForeColor = Color.DimGray };
     private readonly CheckBox _chkEnable = new() { Text = "เปิด HTTPS", AutoSize = true };
     private readonly NumericUpDown _numPort = new() { Minimum = 1, Maximum = 65535, Width = 90 };
-    private readonly Button _btnCreate = new() { Text = "① สร้าง / ต่ออายุใบรับรอง", Width = 250 };
+    private readonly Button _btnCreate = new() { Text = "① สร้าง / ต่ออายุใบรับรอง (mkcert)", Width = 250 };
+    private readonly Button _btnImport = new() { Text = "นำเข้าใบรับรองจริงที่ซื้อมา (.crt/.key/.pfx)", Width = 250 };
     private readonly Button _btnApply = new() { Text = "② บันทึกและใช้ HTTPS", Width = 250 };
     private readonly Button _btnRestart = new() { Text = "③ รีสตาร์ท Apache เดี๋ยวนี้", Width = 250 };
     private readonly Button _btnFirewall = new() { Text = "เปิดพอร์ต 443 ใน Firewall", Width = 250 };
@@ -68,7 +69,7 @@ public sealed class HttpsManagerForm : Form
 
         // ---- ① ใบรับรอง ----
         var g1 = new GroupBox { Text = " ① ใบรับรอง (ครอบคลุม localhost + Virtual Host ทุกตัว) ", Dock = DockStyle.Fill, Padding = new Padding(10, 2, 10, 4) };
-        var l1 = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
+        var l1 = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3 };
         l1.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 270));
         l1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         _lblStep1.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
@@ -79,6 +80,7 @@ public sealed class HttpsManagerForm : Form
         l1.Controls.Add(_lblCert, 1, 0);
         l1.Controls.Add(_btnCreate, 0, 1);
         l1.Controls.Add(_lblDomains, 1, 1);
+        l1.Controls.Add(_btnImport, 0, 2);
         g1.Controls.Add(l1);
         root.Controls.Add(g1);
 
@@ -133,6 +135,18 @@ public sealed class HttpsManagerForm : Form
         root.Controls.Add(note);
 
         _btnCreate.Click += (s, e) => CreateCert();
+        _btnImport.Click += (s, e) =>
+        {
+            new ImportCertForm(_paths, _cfg, _log, _dl).ShowDialog(this);
+            RefreshState();
+            if (HttpsHelper.IsCertReady(_paths) && !_cfg.Apache.EnableHttps)
+            {
+                var ans = MessageBox.Show(
+                    "นำเข้าใบรับรองจริงแล้ว — เปิด HTTPS ใช้เลยไหม?\n(โปรแกรมจะเขียน config และรีสตาร์ท Apache ถ้ากำลังรัน)",
+                    "เปิด HTTPS", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (ans == DialogResult.Yes) ApplyHttps();
+            }
+        };
         _btnApply.Click += (s, e) => ApplyHttps();
         _btnRestart.Click += (s, e) => RestartApache();
         _btnFirewall.Click += (s, e) => OpenFirewall();

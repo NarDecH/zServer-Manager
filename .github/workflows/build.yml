@@ -2,9 +2,12 @@ name: build
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
+  # build ปกติ — ทุก push: ได้ artifact ZServerManager.exe
   build:
     runs-on: windows-latest
     steps:
@@ -31,3 +34,48 @@ jobs:
         with:
           name: ZServerManager
           path: bin/ZServerManager.exe
+
+  # release — เฉพาะเมื่อ push tag v*: build Setup.exe แล้วแนบขึ้น GitHub Release
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Publish single-file exe
+        run: >
+          dotnet publish src/ZServer.Manager/ZServer.Manager.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true -o bin
+
+      - name: Build Setup.exe
+        shell: pwsh
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer/zserver-setup.iss'
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $exe = "installer/Output/zServer-Setup-$($tag.TrimStart('v')).exe"
+          if (-not (Test-Path $exe)) { throw "ไม่พบไฟล์ Setup: $exe" }
+          gh release create $tag $exe `
+            --title "zServer Manager $tag" `
+            --notes "ดาวน์โหลด **Setup.exe** แล้วรัน (ต้องการสิทธิ์ admin) — ติดตั้งลง ``C:\zServer`` พร้อม shortcut และคู่มือภาษาไทย`n`nตัวโปรแกรมเป็น single-file self-contained (ไม่ต้องติดตั้ง .NET)`n`nคู่มือทั้งหมดอยู่ในโฟลเดอร์ docs\ หลังติดตั้ง หรืออ่านบน repo" `
+            --latest
+
+  # ผู้ใช้อยาก release ด้วยมือก็รัน workflow นี้ด้วย workflow_dispatch + ใส่ tag ไว้แล้ว

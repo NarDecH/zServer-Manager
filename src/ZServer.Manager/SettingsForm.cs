@@ -27,9 +27,7 @@ public sealed class SettingsForm : Form
     private readonly CheckBox _chkDeflate = new() { Text = "เปิดบีบอัดข้อมูล (deflate)" };
     private readonly CheckBox _chkExpires = new() { Text = "เปิด cache ฝั่ง browser (expires)" };
     private readonly CheckBox _chkAutoIndex = new() { Text = "แสดงรายการไฟล์เมื่อไม่มี index (directory listing)" };
-    private readonly CheckBox _chkHttps = new() { Text = "เปิด HTTPS (ต้องสร้างใบรับรองก่อน)" };
-    private readonly NumericUpDown _numHttpsPort = new() { Minimum = 1, Maximum = 65535, Width = 90 };
-    private readonly Button _btnMkcert = new() { Text = "สร้างใบรับรอง (mkcert)" };
+    private readonly Button _btnHttpsManager = new() { Text = "จัดการ HTTPS… (สร้างใบรับรอง/เปิด-ปิด)" };
 
     // PHP
     private readonly ComboBox _cboMemory = MakeEditableCombo("128M", "256M", "512M", "1024M", "2048M");
@@ -179,7 +177,7 @@ public sealed class SettingsForm : Form
         AddRow(layout, "KeepAlive timeout (วินาที)", Wrap(_chkKeepAlive, _numKeepAlive));
         AddRow(layout, "ThreadsPerChild (จำนวนเธรด)", _numThreads);
         AddRow(layout, "โมดูลเสริม", Wrap(_chkRewrite, _chkDeflate, _chkExpires, _chkAutoIndex));
-        AddRow(layout, "HTTPS", Wrap(_chkHttps, _numHttpsPort, _btnMkcert));
+        AddRow(layout, "HTTPS", _btnHttpsManager);
         tabApache.Controls.Add(layout);
 
         var tabPhp = new TabPage("PHP");
@@ -259,7 +257,10 @@ public sealed class SettingsForm : Form
             if (dlg.ShowDialog(this) == DialogResult.OK) _txtDocRoot.Text = dlg.SelectedPath;
         };
         _btnRootPassword.Click += (s, e) => SetRootPasswordFlow();
-        _btnMkcert.Click += (s, e) => GenerateHttpsCert();
+        _btnHttpsManager.Click += (s, e) =>
+        {
+            new HttpsManagerForm(_paths, _cfg, _log, _dl).ShowDialog(this);
+        };
         _btnSwitchPhp.Click += (s, e) => SwitchPhpVersion();
         _btnBrowseVhost.Click += (s, e) =>
         {
@@ -353,8 +354,6 @@ public sealed class SettingsForm : Form
         _numLogRetention.Value = Math.Clamp(_cfg.General.LogRetentionDays, 0, 365);
 
         var a = _cfg.Apache;
-        _chkHttps.Checked = a.EnableHttps;
-        _numHttpsPort.Value = Math.Clamp(a.HttpsPort, 1, 65535);
         _numPort.Value = Clamp(a.Port, 1, 65535);
         _txtServerName.Text = a.ServerName;
         _txtServerAdmin.Text = a.ServerAdmin;
@@ -514,13 +513,6 @@ public sealed class SettingsForm : Form
             a.EnableDeflate = _chkDeflate.Checked;
             a.EnableExpires = _chkExpires.Checked;
             a.EnableAutoIndex = _chkAutoIndex.Checked;
-
-            // HTTPS เปิดได้เมื่อมีใบรับรองจริงเท่านั้น (กัน config ชี้ไฟล์ที่ไม่มี)
-            a.EnableHttps = _chkHttps.Checked && HttpsHelper.IsCertReady(_paths);
-            if (_chkHttps.Checked && !a.EnableHttps)
-                MessageBox.Show("ยังไม่มีใบรับรอง HTTPS — กด \"สร้างใบรับรอง (mkcert)\" ก่อน จึงจะเปิดได้",
-                    "แจ้งทราบ", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            a.HttpsPort = (int)_numHttpsPort.Value;
 
             var vhosts = new List<VhostInfo>();
             foreach (var item in _clbVhosts.Items.Cast<VhostInfo>())
@@ -808,43 +800,6 @@ public sealed class SettingsForm : Form
         finally
         {
             _btnSwitchPhp.Enabled = true;
-            UseWaitCursor = false;
-        }
-    }
-
-    // ================= HTTPS (mkcert) =================
-    private async void GenerateHttpsCert()
-    {
-        if (!File.Exists(_paths.ApacheBin))
-        {
-            MessageBox.Show("ยังไม่ได้ติดตั้ง Apache", "ตรวจสอบ",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
-        }
-
-        _btnMkcert.Enabled = false;
-        UseWaitCursor = true;
-        try
-        {
-            var names = new List<string> { _cfg.Apache.ServerName };
-            names.AddRange(_cfg.Apache.VirtualHosts.Where(v => v.Enabled).Select(v => v.Name));
-            await HttpsHelper.SetupAsync(_paths, _log, _dl, names);
-
-            MessageBox.Show(
-                "สร้างใบรับรอง HTTPS เสร็จ ✓\n\n" +
-                "ขั้นตอนต่อ: ติ๊ก \"เปิด HTTPS\" → กดบันทึกและใช้ค่าใหม่ → รีสตาร์ท Apache\n" +
-                "แล้วเข้าได้ที่ https://" + _cfg.Apache.ServerName +
-                (_cfg.Apache.HttpsPort != 443 ? ":" + _cfg.Apache.HttpsPort : ""),
-                "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show("สร้างใบรับรองไม่สำเร็จ:\n" + ex.Message, "ผิดพลาด",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
-        finally
-        {
-            _btnMkcert.Enabled = true;
             UseWaitCursor = false;
         }
     }

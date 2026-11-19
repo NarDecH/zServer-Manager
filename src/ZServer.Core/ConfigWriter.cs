@@ -64,27 +64,7 @@ public sealed class ConfigWriter
         var certFile = Path.Combine(_p.ApacheDir, "conf", "ssl", "cert.pem");
         var keyFile = Path.Combine(_p.ApacheDir, "conf", "ssl", "key.pem");
         var httpsReady = a.EnableHttps && File.Exists(certFile);
-        var httpsListen = httpsReady ? "\nListen " + a.HttpsPort : "";
-        var httpsBlock = httpsReady
-            ? $"""
-              # ---------- HTTPS (ใบรับรองทดสอบจาก mkcert) ----------
-              <IfModule ssl_module>
-                  Listen {a.HttpsPort}
-                  <VirtualHost *:{a.HttpsPort}>
-                      ServerName {a.ServerName}:{a.HttpsPort}
-                      DocumentRoot "{docRoot}"
-                      SSLEngine on
-                      SSLCertificateFile "{Fw(certFile)}"
-                      SSLCertificateKeyFile "{Fw(keyFile)}"
-                      <Directory "{docRoot}">
-                          Options {(a.EnableAutoIndex ? "+Indexes" : "-Indexes")} +FollowSymLinks
-                          AllowOverride All
-                          Require all granted
-                      </Directory>
-                  </VirtualHost>
-              </IfModule>
-              """
-            : "# ---------- HTTPS ----------\n# (ยังไม่เปิดใช้ — สร้างใบรับรองและเปิดในหน้าตั้งค่า)";
+        var httpsBlock = httpsReady ? BuildHttpsBlock(a, docRoot, Fw(certFile), Fw(keyFile)) : "# ---------- HTTPS ----------\n# (ยังไม่เปิดใช้ — สร้างใบรับรองและเปิดในหน้าตั้งค่า)";
 
         var deflateBlock = a.EnableDeflate
             ? $"""
@@ -177,7 +157,7 @@ public sealed class ConfigWriter
             Define SRVROOT "{{Fw(_p.ApacheDir)}}"
 
             ServerRoot "${SRVROOT}"
-            Listen {{a.Port}}{{httpsListen}}
+            Listen {{a.Port}}
             ServerName {{a.ServerName}}:{{a.Port}}
             ServerAdmin {{a.ServerAdmin}}
 
@@ -254,6 +234,38 @@ public sealed class ConfigWriter
         WriteFile(_p.ApacheConf, conf);
         _log.Info($"เขียน {Path.GetFileName(_p.ApacheConf)} เรียบร้อย (พอร์ต {a.Port})");
         WriteVhostsConf();
+    }
+
+    /// <summary>สร้าง block HTTPS: เว็บหลัก + Virtual Host ทุกตัว (ใช้ใบรับรองเดียวกัน — SAN ครอบคลุมทุกโดเมน)</summary>
+    private string BuildHttpsBlock(ApacheSettings a, string docRoot, string certFile, string keyFile)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("# ---------- HTTPS (ใบรับรองทดสอบจาก mkcert) ----------");
+        sb.AppendLine("<IfModule ssl_module>");
+        sb.AppendLine($"    Listen {a.HttpsPort}");
+
+        void Vhost(string serverName, string root)
+        {
+            sb.AppendLine($"    <VirtualHost *:{a.HttpsPort}>");
+            sb.AppendLine($"        ServerName {serverName}:{a.HttpsPort}");
+            sb.AppendLine($"        DocumentRoot \"{root}\"");
+            sb.AppendLine("        SSLEngine on");
+            sb.AppendLine($"        SSLCertificateFile \"{certFile}\"");
+            sb.AppendLine($"        SSLCertificateKeyFile \"{keyFile}\"");
+            sb.AppendLine($"        <Directory \"{root}\">");
+            sb.AppendLine($"            Options {(a.EnableAutoIndex ? "+Indexes" : "-Indexes")} +FollowSymLinks");
+            sb.AppendLine("            AllowOverride All");
+            sb.AppendLine("            Require all granted");
+            sb.AppendLine("        </Directory>");
+            sb.AppendLine("    </VirtualHost>");
+        }
+
+        Vhost(a.ServerName, docRoot);
+        foreach (var v in _c.Apache.VirtualHosts.Where(v => v.Enabled && !string.IsNullOrWhiteSpace(v.Name)))
+            Vhost(v.Name, Fw(v.Path));
+
+        sb.AppendLine("</IfModule>");
+        return sb.ToString();
     }
 
     // ================= Virtual Hosts: conf/zserver-vhosts.conf =================

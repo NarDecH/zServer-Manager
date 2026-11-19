@@ -5,7 +5,7 @@
 ; ============================================================
 
 #define MyAppName "zServer Manager"
-#define MyAppVersion "1.3.0"
+#define MyAppVersion "1.4.0"
 #define MyAppPublisher "zServer"
 #define MyAppExeName "ZServerManager.exe"
 

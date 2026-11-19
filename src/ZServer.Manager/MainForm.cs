@@ -175,6 +175,7 @@ public sealed class MainForm : Form
         actions.Controls.Add(MakeButton("เริ่มทั้งหมด", StartAll));
         actions.Controls.Add(MakeButton("หยุดทั้งหมด", StopAll));
         actions.Controls.Add(MakeButton("เปิดพอร์ต Firewall", OpenFirewall));
+        actions.Controls.Add(MakeButton("HTTPS", () => ShowDialogForm(new HttpsManagerForm(_paths, _cfg, _log, _dl))));
         actions.Controls.Add(MakeButton("เปิด Terminal", OpenTerminal));
         actions.Controls.Add(MakeButton("คู่มือการใช้งาน", OpenHelp));
         actions.Controls.Add(MakeButton("เปิดเว็บ localhost", () =>

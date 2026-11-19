@@ -73,9 +73,14 @@ jobs:
           $tag = "${{ github.ref_name }}"
           $exe = "installer/Output/zServer-Setup-$($tag.TrimStart('v')).exe"
           if (-not (Test-Path $exe)) { throw "ไม่พบไฟล์ Setup: $exe" }
-          gh release create $tag $exe `
-            --title "zServer Manager $tag" `
-            --notes "ดาวน์โหลด **Setup.exe** แล้วรัน (ต้องการสิทธิ์ admin) — ติดตั้งลง ``C:\zServer`` พร้อม shortcut และคู่มือภาษาไทย`n`nตัวโปรแกรมเป็น single-file self-contained (ไม่ต้องติดตั้ง .NET)`n`nคู่มือทั้งหมดอยู่ในโฟลเดอร์ docs\ หลังติดตั้ง หรืออ่านบน repo" `
-            --draft
+          # ถ้ามี release นี้อยู่แล้ว (เช่นหลัง force-push tag) → อัพโหลดไฟล์ทับเท่านั้น
+          if (gh release view $tag) {
+            gh release upload $tag $exe --clobber
+          } else {
+            gh release create $tag $exe `
+              --title "zServer Manager $tag" `
+              --notes "ดาวน์โหลด **Setup.exe** แล้วรัน (ต้องการสิทธิ์ admin) — ติดตั้งลง ``C:\zServer`` พร้อม shortcut และคู่มือภาษาไทย`n`nตัวโปรแกรมเป็น single-file self-contained (ไม่ต้องติดตั้ง .NET)`n`nคู่มือทั้งหมดอยู่ในโฟลเดอร์ docs\ หลังติดตั้ง หรืออ่านบน repo" `
+              --draft
+          }
 
   # ผู้ใช้อยาก release ด้วยมือก็รัน workflow นี้ด้วย workflow_dispatch + ใส่ tag ไว้แล้ว

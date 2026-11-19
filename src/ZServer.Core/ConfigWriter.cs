@@ -359,6 +359,16 @@ public sealed class ConfigWriter
             }
         }
 
+        // Xdebug (เขียนเมื่อเปิดใช้ + มีไฟล์จริง — ใช้ debug กับ VS Code)
+        var xdebugDll = Path.Combine(_p.PhpDir, "ext", "php_xdebug.dll");
+        if (php.XdebugEnabled && File.Exists(xdebugDll))
+        {
+            sb.AppendLine($"zend_extension = \"{xdebugDll}\"");
+            sb.AppendLine("xdebug.mode = debug");
+            sb.AppendLine($"xdebug.client_port = {php.XdebugPort}");
+            sb.AppendLine("xdebug.start_with_request = yes");
+        }
+
         sb.AppendLine(end);
 
         WriteFile(_p.PhpIni, content.TrimEnd() + "\n" + sb.ToString());

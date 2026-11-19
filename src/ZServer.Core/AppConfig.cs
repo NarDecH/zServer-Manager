@@ -57,6 +57,9 @@ public sealed class PhpSettings
     public bool LogErrors { get; set; } = true;
     public string Timezone { get; set; } = "Asia/Bangkok";
     public bool OpCache { get; set; } = true;
+    /// <summary>เปิด Xdebug (ต้องมี php_xdebug.dll ใน ext\ ด้วยจึงจะมีผล)</summary>
+    public bool XdebugEnabled { get; set; } = false;
+    public int XdebugPort { get; set; } = 9003;
     /// <summary>ชื่อ extension (ไม่รวมนำหน้า php_) → เปิด/ปิด</summary>
     public Dictionary<string, bool> Extensions { get; set; } = new()
     {
@@ -81,6 +84,16 @@ public sealed class MariaDbSettings
     public string DataDir { get; set; } = "";
     /// <summary>ที่อยู่ที่อนุญาตให้ฟัง — 127.0.0.1 = เฉพาะเครื่องนี้, ว่าง = ทุก interface (เสี่ยง)</summary>
     public string BindAddress { get; set; } = "127.0.0.1";
+    /// <summary>รหัสผ่าน root เข้ารหัสด้วย DPAPI (ใช้กับงานอัตโนมัติ เช่น backup — ถอดได้เฉพาะเครื่องนี้)</summary>
+    public string RootPasswordEnc { get; set; } = "";
+    /// <summary>สำรองฐานข้อมูลอัตโนมัติทุกวัน</summary>
+    public bool AutoBackupEnabled { get; set; } = false;
+    /// <summary>เวลาทำสำรอง (รูปแบบ HH:mm)</summary>
+    public string AutoBackupTime { get; set; } = "03:00";
+    /// <summary>เก็บไฟล์สำรองไว้กี่วัน (0 = ไม่จำกัด)</summary>
+    public int AutoBackupRetentionDays { get; set; } = 7;
+    /// <summary>สำรองสำเร็จล่าสุดเมื่อไร</summary>
+    public DateTime? LastDbBackupDate { get; set; }
     public string CharacterSet { get; set; } = "utf8mb4";
     public string Collation { get; set; } = "utf8mb4_unicode_ci";
     public string InnoDBBufferPoolSize { get; set; } = "256M";

@@ -476,8 +476,13 @@ public sealed class InstallForm : Form
                     if (dlg.ShowDialog(this) == DialogResult.OK)
                     {
                         db.SetRootPassword(dlg.NewPassword, dlg.OldPassword);
-                        MessageBox.Show("ตั้งรหัสผ่าน root เรียบร้อย", "สำเร็จ",
-                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        // เก็บเข้ารหัสไว้ให้งานอัตโนมัติ (backup) ใช้ — DPAPI ถอดได้เฉพาะเครื่องนี้
+                        _cfg.MariaDb.RootPasswordEnc = dlg.NewPassword.Length == 0
+                            ? ""
+                            : SecretProtector.Protect(dlg.NewPassword);
+                        _cfg.Save(_paths);
+                        MessageBox.Show("ตั้งรหัสผ่าน root เรียบร้อย (โปรแกรมเก็บเข้ารหัสไว้ให้งานสำรองอัตโนมัติด้วย)",
+                            "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             }

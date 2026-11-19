@@ -35,6 +35,7 @@ public sealed class MainForm : Form
     private readonly Button _btnClearLogFile = new();
     private readonly Button _btnNewVersion = new();
     private readonly System.Windows.Forms.Timer _updateCheckTimer = new() { Interval = 6 * 60 * 60 * 1000 }; // ตรวจทุก 6 ชม.
+    private readonly System.Windows.Forms.Timer _backupTimer = new() { Interval = 60_000 }; // เช็คเวลาสำรองอัตโนมัติทุก 1 นาที
     private string? _lastNotifiedSet;
     private string? _lastProgramNotified;
     private readonly ToolStripStatusLabel _statusLabel = new();
@@ -77,11 +78,15 @@ public sealed class MainForm : Form
         _timer.Tick += (s, e) => RefreshStatuses();
         _timer.Start();
         _updateCheckTimer.Tick += (s, e) => RunUpdateCheckAsync();
+        _backupTimer.Tick += (s, e) => _ = Task.Run(() =>
+        {
+            try { DbBackupScheduler.CheckAndRun(_paths, _cfg, _log); } catch { }
+        });
 
         Shown += OnShownFirstTime;
         Resize += OnResizeForTray;
         FormClosing += OnFormClosingGuard;
-        FormClosed += (s, e) => { _tray.Visible = false; _tray.Dispose(); _timer.Stop(); _updateCheckTimer.Stop(); _dl.Dispose(); };
+        FormClosed += (s, e) => { _tray.Visible = false; _tray.Dispose(); _timer.Stop(); _updateCheckTimer.Stop(); _backupTimer.Stop(); _dl.Dispose(); };
     }
 
     // ================= ไอคอนโปรแกรม =================
@@ -159,6 +164,7 @@ public sealed class MainForm : Form
         actions.Controls.Add(_btnNewVersion);
         actions.Controls.Add(MakeButton("ตั้งค่า", () => ShowDialogForm(new SettingsForm(_paths, _cfg, _log, _dl))));
         actions.Controls.Add(MakeButton("แก้ไขไฟล์ Config", () => ShowDialogForm(new ConfigEditorForm(_paths, _cfg, _log, _cw))));
+        actions.Controls.Add(MakeButton("ฐานข้อมูล", () => ShowDialogForm(new DbWizardForm(_paths, _cfg, _log, _dl))));
         actions.Controls.Add(MakeButton("ดู Logs", () => ShowDialogForm(new LogsForm(_paths, _cfg))));
         actions.Controls.Add(MakeButton("เริ่มทั้งหมด", StartAll));
         actions.Controls.Add(MakeButton("หยุดทั้งหมด", StopAll));
@@ -391,6 +397,7 @@ public sealed class MainForm : Form
     {
         RefreshStatuses();
         RunUpdateCheckAsync(); // ตรวจเวอร์ชันใหม่ตอนเปิดโปรแกรม (เบื้องหลัง)
+        _backupTimer.Start();  // เริ่มจับเวลาสำรองฐานข้อมูลอัตโนมัติ
 
         // จัดเก็บ/บีบอัด log เก่ากว่า LogRetentionDays วัน (ตามค่าตั้ง)
         _ = Task.Run(() =>

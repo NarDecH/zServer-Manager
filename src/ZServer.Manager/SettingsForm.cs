@@ -55,6 +55,14 @@ public sealed class SettingsForm : Form
     // MariaDB
     private readonly CheckBox _chkBindLocal = new() { Text = "อนุญาตเฉพาะเครื่องนี้ (127.0.0.1 — แนะนำ)" };
     private readonly NumericUpDown _numDbPort = MakeNum(1, 65535);
+    private readonly CheckBox _chkAutoBackup = new() { Text = "เปิดสำรองอัตโนมัติทุกวัน" };
+    private readonly TextBox _txtBackupTime = new() { Width = 90 };
+    private readonly NumericUpDown _numBackupRetention = MakeNum(0, 365);
+    private readonly Button _btnBackupNow = new() { Text = "สำรองเดี๋ยวนี้" };
+    private readonly Button _btnOpenBackupFolder = new() { Text = "เปิดโฟลเดอร์สำรอง" };
+    private readonly Label _lblBackupState = new() { AutoSize = true, ForeColor = Color.DimGray, Padding = new Padding(6, 8, 0, 0) };
+    private readonly TextBox _txtRootPass = new() { UseSystemPasswordChar = true, Width = 220 };
+    private readonly Label _lblRootPassState = new() { AutoSize = true, ForeColor = Color.DimGray, Padding = new Padding(6, 8, 0, 0) };
     private readonly TextBox _txtDataDir = new() { ReadOnly = true, BackColor = Color.Gainsboro };
     private readonly ComboBox _cboCharset = MakeEditableCombo("utf8mb4", "utf8", "latin1", "tis620");
     private readonly ComboBox _cboCollation = MakeEditableCombo("utf8mb4_unicode_ci", "utf8mb4_general_ci", "utf8_general_ci", "latin1_swedish_ci", "utf8_tis_620");
@@ -89,6 +97,9 @@ public sealed class SettingsForm : Form
     // ทั่วไป
     private readonly CheckBox _chkDarkTheme = new() { Text = "ใช้ธีมมืด (หน้าหลักปรับทันที, หน้าอื่นเมื่อเปิดครั้งถัดไป)" };
     private readonly NumericUpDown _numLogRetention = new() { Minimum = 0, Maximum = 365, Width = 90 };
+    private readonly CheckBox _chkXdebug = new() { Text = "เปิด Xdebug (debug ผ่าน VS Code)" };
+    private readonly NumericUpDown _numXdebugPort = new() { Minimum = 1, Maximum = 65535, Width = 90 };
+    private readonly Label _lblXdebugState = new() { AutoSize = true, ForeColor = Color.DimGray };
 
     private readonly Downloader _dl;
 
@@ -177,6 +188,8 @@ public sealed class SettingsForm : Form
         AddRow(layout2, "max_input_vars", _numMaxVars);
         AddRow(layout2, "การแสดง/เก็บ error", Wrap(_chkDisplayErrors, _chkLogErrors));
         AddRow(layout2, "OPcache", _chkOpCache);
+        AddRow(layout2, "Xdebug (VS Code)", Wrap(_chkXdebug, _numXdebugPort));
+        AddRow(layout2, "สถานะ Xdebug", _lblXdebugState);
         AddRow(layout2, "เขตเวลา (date.timezone)", _cboTimezone);
         AddRow(layout2, "Extensions (โมดูลเสริม)", _pnlExtensions);
         tabPhp.Controls.Add(layout2);
@@ -185,6 +198,9 @@ public sealed class SettingsForm : Form
         var layout3 = MakeTwoColumnLayout();
         AddRow(layout3, "พอร์ต", _numDbPort);
         AddRow(layout3, "การเข้าถึง", _chkBindLocal);
+        AddRow(layout3, "สำรองข้อมูลอัตโนมัติ", Wrap(_chkAutoBackup, new Label { Text = "เวลา:", AutoSize = true, Padding = new Padding(6, 8, 0, 0) }, _txtBackupTime, new Label { Text = "เก็บ (วัน):", AutoSize = true, Padding = new Padding(6, 8, 0, 0) }, _numBackupRetention));
+        AddRow(layout3, "ทำสำรองเดี๋ยวนี้", Wrap(_btnBackupNow, _btnOpenBackupFolder, _lblBackupState));
+        AddRow(layout3, "รหัสผ่าน root (งานอัตโนมัติ)", Wrap(_txtRootPass, _lblRootPassState));
         AddRow(layout3, "โฟลเดอร์ข้อมูล (datadir) — ไม่ควรเปลี่ยน", _txtDataDir);
         AddRow(layout3, "character-set-server", _cboCharset);
         AddRow(layout3, "collation-server", _cboCollation);
@@ -248,6 +264,13 @@ public sealed class SettingsForm : Form
         _btnDelVhost.Click += (s, e) =>
         {
             if (_clbVhosts.SelectedIndex >= 0) _clbVhosts.Items.RemoveAt(_clbVhosts.SelectedIndex);
+        };
+        _btnBackupNow.Click += (s, e) => BackupNow();
+        _btnOpenBackupFolder.Click += (s, e) =>
+        {
+            var dir = Path.Combine(_paths.BackupsDir, "databases");
+            Directory.CreateDirectory(dir);
+            try { System.Diagnostics.Process.Start("explorer.exe", "\"" + dir + "\""); } catch { }
         };
 
         _btnInstallApacheSvc.Click += (s, e) => ServiceAction(installApache: true);
@@ -349,10 +372,18 @@ public sealed class SettingsForm : Form
         _chkOpCache.Checked = p.OpCache;
         _cboTimezone.Text = p.Timezone;
         BuildExtensionsPanel();
+        _chkXdebug.Checked = p.XdebugEnabled;
+        _numXdebugPort.Value = Clamp(p.XdebugPort, 1, 65535);
+        UpdateXdebugState();
 
         var m = _cfg.MariaDb;
         _chkBindLocal.Checked = m.BindAddress == "127.0.0.1";
         _numDbPort.Value = Clamp(m.Port, 1, 65535);
+        _chkAutoBackup.Checked = m.AutoBackupEnabled;
+        _txtBackupTime.Text = m.AutoBackupTime;
+        _numBackupRetention.Value = Clamp(m.AutoBackupRetentionDays, 0, 365);
+        UpdateRootPassState();
+        UpdateBackupState();
         _txtDataDir.Text = m.DataDir;
         _cboCharset.Text = m.CharacterSet;
         _cboCollation.Text = m.Collation;
@@ -502,6 +533,8 @@ public sealed class SettingsForm : Form
             p.LogErrors = _chkLogErrors.Checked;
             p.OpCache = _chkOpCache.Checked;
             p.Timezone = string.IsNullOrWhiteSpace(_cboTimezone.Text) ? "Asia/Bangkok" : _cboTimezone.Text.Trim();
+            p.XdebugEnabled = _chkXdebug.Checked;
+            p.XdebugPort = (int)_numXdebugPort.Value;
             // เก็บ extension ทั้งหมด (รวมตัวที่ไม่อยู่ในกลุ่มแสดงผล) แล้วทับด้วยค่าจาก checkbox
             var ext = new Dictionary<string, bool>(_cfg.Php.Extensions);
             foreach (var cb in _pnlExtensions.Controls.OfType<CheckBox>())
@@ -516,6 +549,17 @@ public sealed class SettingsForm : Form
             m.KeyBufferSize = _cboKeyBuffer.Text.Trim();
             m.MaxConnections = (int)_numMaxConn.Value;
             m.LowerCaseTableNames = (int)_numLowercase.Value;
+
+            if (!TimeSpan.TryParse(_txtBackupTime.Text.Trim(), out _))
+                throw new InvalidOperationException("เวลาสำรองอัตโนมัติต้องเป็นรูปแบบ HH:mm เช่น 03:00");
+            m.AutoBackupEnabled = _chkAutoBackup.Checked;
+            m.AutoBackupTime = _txtBackupTime.Text.Trim();
+            m.AutoBackupRetentionDays = (int)_numBackupRetention.Value;
+            if (_txtRootPass.Text.Length > 0)
+            {
+                m.RootPasswordEnc = SecretProtector.Protect(_txtRootPass.Text);
+                _txtRootPass.Clear();
+            }
 
             var bindLocal = _chkBindLocal.Checked;
             if (!bindLocal && MessageBox.Show(
@@ -618,6 +662,73 @@ public sealed class SettingsForm : Form
     private static void RunQuiet(Action a)
     {
         try { a(); } catch (Exception ex) { MessageBox.Show(ex.Message, "ผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+    }
+
+    // ================= สำรองฐานข้อมูล / สถานะ =================
+    private void UpdateRootPassState()
+    {
+        _lblRootPassState.Text = string.IsNullOrWhiteSpace(_cfg.MariaDb.RootPasswordEnc)
+            ? "ยังไม่ได้บันทึก — เว้นว่างได้ถ้า root ไม่มีรหัสผ่าน"
+            : "บันทึกไว้แล้ว ✓ (เข้ารหัส DPAPI) — พิมพ์ทับเพื่อเปลี่ยน";
+    }
+
+    private void UpdateXdebugState()
+    {
+        if (!File.Exists(_paths.PhpBin))
+        {
+            _lblXdebugState.Text = "ยังไม่ได้ติดตั้ง PHP";
+            return;
+        }
+        var dll = Path.Combine(_paths.PhpDir, "ext", "php_xdebug.dll");
+        _lblXdebugState.Text = File.Exists(dll)
+            ? "พบ php_xdebug.dll ✓ — ติ๊กเปิด กดบันทึก รีสตาร์ท Apache แล้ว debug ผ่าน VS Code ได้"
+            : "ยังไม่มี php_xdebug.dll — โหลดจาก xdebug.org/wizard ตามเวอร์ชัน PHP แล้ววางที่ php\\ext\\php_xdebug.dll";
+    }
+
+    private void UpdateBackupState()
+    {
+        var dir = Path.Combine(_paths.BackupsDir, "databases");
+        var count = Directory.Exists(dir) ? Directory.GetFiles(dir, "*.sql").Length : 0;
+        var last = _cfg.MariaDb.LastDbBackupDate?.ToString("dd/MM/yyyy HH:mm") ?? "ยังไม่เคย";
+        _lblBackupState.Text = $"สำรองล่าสุด: {last} | ไฟล์ {count} ตัว";
+    }
+
+    private async void BackupNow()
+    {
+        if (!File.Exists(_paths.MariaDbBin))
+        {
+            MessageBox.Show("ยังไม่ได้ติดตั้ง MariaDB", "ตรวจสอบ",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        _btnBackupNow.Enabled = false;
+        _lblBackupState.Text = "กำลังสำรอง…";
+        try
+        {
+            var db = new MariaDbManager(_paths, _cfg, _log, _dl);
+            var dir = Path.Combine(_paths.BackupsDir, "databases");
+            Directory.CreateDirectory(dir);
+            var file = Path.Combine(dir, "all-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".sql");
+            var done = await Task.Run(() => db.DumpAll(file));
+            _cfg.MariaDb.LastDbBackupDate = DateTime.Now;
+            _cfg.Save(_paths);
+            _log.Info("ผู้ใช้สำรองฐานข้อมูลด้วยมือ: " + done);
+            MessageBox.Show(
+                $"สำรองสำเร็จ ✓\n{done}\nขนาด {new FileInfo(done).Length / 1024.0 / 1024.0:F1} MB",
+                "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("สำรองไม่สำเร็จ (ต้องเริ่ม MariaDB ก่อน):\n" + ex.Message, "ผิดพลาด",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _lblBackupState.Text = "สำรองไม่สำเร็จ";
+        }
+        finally
+        {
+            _btnBackupNow.Enabled = true;
+            UpdateBackupState();
+        }
     }
 
     // ================= HTTPS (mkcert) =================

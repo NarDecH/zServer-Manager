@@ -398,17 +398,82 @@ public sealed class MariaDbManager : ComponentManager
         }
     }
 
-    /// <summary>รัน SQL ด้วย root (ใช้ตอนตั้งรหัสผ่าน/ตรวจสุขภาพ)</summary>
+    /// <summary>รหัสผ่าน root ที่บันทึกไว้ (DPAPI) — ใช้เมื่อไม่ได้ส่งค่ามาตรง ๆ</summary>
+    public string StoredPassword()
+    {
+        return string.IsNullOrWhiteSpace(C.MariaDb.RootPasswordEnc)
+            ? ""
+            : SecretProtector.Unprotect(C.MariaDb.RootPasswordEnc);
+    }
+
+    /// <summary>รัน SQL ด้วย root (ถ้าไม่ส่งรหัสผ่านจะใช้ค่าที่บันทึกไว้อัตโนมัติ)</summary>
     public (int Code, string Output) RunSql(string sql, string? rootPassword = null)
     {
         if (!File.Exists(P.MariaDbClient))
             return (-1, "ไม่พบ mariadb.exe");
+        var pass = rootPassword ?? StoredPassword();
         var args = $"--port={C.MariaDb.Port} --protocol=TCP -u root";
-        if (!string.IsNullOrEmpty(rootPassword))
-            args += $" --password=\"{rootPassword.Replace("\"", "\\\"")}\"";
+        if (!string.IsNullOrEmpty(pass))
+            args += $" --password=\"{pass.Replace("\"", "\\\"")}\"";
         args += $" --execute=\"{sql.Replace("\"", "\\\"")}\"";
         var (code, stdout, stderr) = ProcessRunner.Run(P.MariaDbClient, args, P.MariaDbDir, 30_000);
         return (code, stdout + stderr);
+    }
+
+    /// <summary>รายชื่อฐานข้อมูลของผู้ใช้ (ตัด system databases และบรรทัด warning ออก)</summary>
+    public List<string> ListDatabases(string? rootPassword = null)
+    {
+        var (code, output) = RunSql("SHOW DATABASES", rootPassword);
+        if (code != 0) return new List<string>();
+        var system = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "information_schema", "performance_schema", "mysql", "sys" };
+        return output.Split('\n')
+            .Skip(1)
+            .Select(l => l.Trim())
+            .Where(l => l.Length > 0
+                && !system.Contains(l)
+                && !l.StartsWith("WARNING", StringComparison.OrdinalIgnoreCase)
+                && !l.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    /// <summary>
+    /// สร้าง database + user + grant สิทธิ์ในคำสั่งเดียว
+    /// สร้าง user ทั้ง 'localhost' และ '127.0.0.1' เพื่อรองรับการเชื่อมต่อแบบ TCP
+    /// </summary>
+    public (bool Ok, string Output) CreateDatabaseAndUser(
+        string dbName, string userName, string password, string? rootPassword = null)
+    {
+        var pw = password.Replace("'", "''");
+        var sql =
+            $"CREATE DATABASE IF NOT EXISTS `{dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" +
+            $"CREATE USER IF NOT EXISTS '{userName}'@'localhost' IDENTIFIED BY '{pw}';" +
+            $"CREATE USER IF NOT EXISTS '{userName}'@'127.0.0.1' IDENTIFIED BY '{pw}';" +
+            $"GRANT ALL PRIVILEGES ON `{dbName}`.* TO '{userName}'@'localhost';" +
+            $"GRANT ALL PRIVILEGES ON `{dbName}`.* TO '{userName}'@'127.0.0.1';" +
+            "FLUSH PRIVILEGES;";
+        var (code, output) = RunSql(sql, rootPassword);
+        return (code == 0, output);
+    }
+
+    /// <summary>สำรองฐานข้อมูลทั้งหมดเป็นไฟล์ .sql (ผ่าน mariadb-dump --result-file)</summary>
+    public string DumpAll(string outFilePath, string? rootPassword = null)
+    {
+        var dumpExe = Path.Combine(P.MariaDbDir, "bin", "mariadb-dump.exe");
+        if (!File.Exists(dumpExe))
+            throw new InvalidOperationException("ไม่พบ mariadb-dump.exe ในโฟลเดอร์ bin");
+        Directory.CreateDirectory(Path.GetDirectoryName(outFilePath)!); // สร้างโฟลเดอร์ให้เอง
+
+        var pass = rootPassword ?? StoredPassword();
+        var args = $"--all-databases --port={C.MariaDb.Port} --protocol=TCP -u root";
+        if (!string.IsNullOrEmpty(pass))
+            args += $" --password=\"{pass.Replace("\"", "\\\"")}\"";
+        args += $" --result-file=\"{outFilePath}\"";
+
+        var (code, stdout, stderr) = ProcessRunner.Run(dumpExe, args, P.MariaDbDir, 1_800_000);
+        if (code != 0)
+            throw new InvalidOperationException("สำรองข้อมูลไม่สำเร็จ:\n" + (stdout + stderr).Trim());
+        return outFilePath;
     }
 
     public void SetRootPassword(string newPassword, string? oldPassword = null)

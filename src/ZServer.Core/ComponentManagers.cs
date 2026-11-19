@@ -267,7 +267,7 @@ public sealed class PhpManager : ComponentManager
         Report(progress, 58, "แตกไฟล์", "แตก zip ลงโฟลเดอร์ชั่วคราว");
         var staging = await Task.Run(() => ZipExtractor.ExtractToStaging(zipPath, P.StagingDir), ct).ConfigureAwait(false);
 
-        Report(progress, 66, "เตรียมโฟลเดอร์", "หยุด Apache ชั่วคราว (ถ้ากำลังใช้ PHP อยู่) และสำรองโฟลเดอร์เก่า");
+        Report(progress, 66, "เตรียมโฟลเดอร์", "หยุด Apache ชั่วคราว (ถ้ากำลังใช้ PHP อยู่) และจัดระบบหลายเวอร์ชัน");
         await Task.Run(() =>
         {
             // Apache โหลด dll ของ PHP ไว้ ต้องหยุดก่อนถึงเปลี่ยนไฟล์ได้
@@ -277,14 +277,22 @@ public sealed class PhpManager : ComponentManager
                 apache.EnsureStoppedForUpgrade();
             }
             catch { }
-            BackupExistingFolder(P.PhpDir, "php-old");
-            ZipExtractor.MoveContents(staging, P.PhpDir);
+
+            // ระบบหลายเวอร์ชัน: ย้าย php\ เดิม (ถ้าเป็นโฟลเดอร์จริง) เข้า php-versions\ ก่อน
+            PhpVersionManager.EnsureVersionsLayout(P, L);
+
+            var versionDir = Path.Combine(PhpVersionManager.VersionsRoot(P), item.Version);
+            if (Directory.Exists(versionDir))
+                BackupExistingFolder(versionDir, "php-old");
+            ZipExtractor.MoveContents(staging, versionDir);
         }, ct).ConfigureAwait(false);
         CleanStaging(staging);
 
-        Report(progress, 82, "เขียน config", "สร้าง php.ini + เชื่อมกับ Apache (httpd.conf)");
+        Report(progress, 82, "เขียน config", "สลับ junction php\\ + สร้าง php.ini + เชื่อมกับ Apache (httpd.conf)");
         await Task.Run(() =>
         {
+            PhpVersionManager.SwitchTo(P, item.Version, L); // ชี้ php\ ไปที่เวอร์ชันใหม่ก่อนเขียน config
+
             var cw = new ConfigWriter(P, C, L);
             cw.WritePhpIni();
             cw.WriteApacheConf(); // ใส่ LoadModule php_module ให้อัตโนมัติ

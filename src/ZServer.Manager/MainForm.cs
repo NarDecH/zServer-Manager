@@ -36,6 +36,10 @@ public sealed class MainForm : Form
     private readonly Button _btnNewVersion = new();
     private readonly System.Windows.Forms.Timer _updateCheckTimer = new() { Interval = 6 * 60 * 60 * 1000 }; // ตรวจทุก 6 ชม.
     private readonly System.Windows.Forms.Timer _backupTimer = new() { Interval = 60_000 }; // เช็คเวลาสำรองอัตโนมัติทุก 1 นาที
+    private readonly System.Windows.Forms.Timer _watchdogTimer = new() { Interval = 30_000 }; // ตรวจเซอร์วิสล้มทุก 30 วิ
+    private readonly Dictionary<string, bool> _watchdogLastRunning = new();
+    private readonly HashSet<string> _watchdogSuppress = new();
+    private bool _watchdogInitialized;
     private string? _lastNotifiedSet;
     private string? _lastProgramNotified;
     private readonly ToolStripStatusLabel _statusLabel = new();
@@ -82,11 +86,12 @@ public sealed class MainForm : Form
         {
             try { DbBackupScheduler.CheckAndRun(_paths, _cfg, _log); } catch { }
         });
+        _watchdogTimer.Tick += (s, e) => WatchdogTick();
 
         Shown += OnShownFirstTime;
         Resize += OnResizeForTray;
         FormClosing += OnFormClosingGuard;
-        FormClosed += (s, e) => { _tray.Visible = false; _tray.Dispose(); _timer.Stop(); _updateCheckTimer.Stop(); _backupTimer.Stop(); _dl.Dispose(); };
+        FormClosed += (s, e) => { _tray.Visible = false; _tray.Dispose(); _timer.Stop(); _updateCheckTimer.Stop(); _backupTimer.Stop(); _watchdogTimer.Stop(); _dl.Dispose(); };
     }
 
     // ================= ไอคอนโปรแกรม =================
@@ -165,6 +170,7 @@ public sealed class MainForm : Form
         actions.Controls.Add(MakeButton("ตั้งค่า", () => ShowDialogForm(new SettingsForm(_paths, _cfg, _log, _dl))));
         actions.Controls.Add(MakeButton("แก้ไขไฟล์ Config", () => ShowDialogForm(new ConfigEditorForm(_paths, _cfg, _log, _cw))));
         actions.Controls.Add(MakeButton("ฐานข้อมูล", () => ShowDialogForm(new DbWizardForm(_paths, _cfg, _log, _dl))));
+        actions.Controls.Add(MakeButton("เว็บใหม่", () => ShowDialogForm(new NewSiteForm(_paths, _cfg, _log, _dl))));
         actions.Controls.Add(MakeButton("ดู Logs", () => ShowDialogForm(new LogsForm(_paths, _cfg))));
         actions.Controls.Add(MakeButton("เริ่มทั้งหมด", StartAll));
         actions.Controls.Add(MakeButton("หยุดทั้งหมด", StopAll));
@@ -251,8 +257,8 @@ public sealed class MainForm : Form
         _btnApacheRestart.Text = "รีสตาร์ท";
         _btnApacheStart.Width = _btnApacheStop.Width = _btnApacheRestart.Width = 92;
         _btnApacheStart.Click += (s, e) => RunAsync("เริ่ม Apache", _stack.StartApache);
-        _btnApacheStop.Click += (s, e) => RunAsync("หยุด Apache", _stack.StopApache);
-        _btnApacheRestart.Click += (s, e) => RunAsync("รีสตาร์ท Apache", _stack.RestartApache);
+        _btnApacheStop.Click += (s, e) => RunAsync("หยุด Apache", _stack.StopApache, "apache");
+        _btnApacheRestart.Click += (s, e) => RunAsync("รีสตาร์ท Apache", _stack.RestartApache, "apache");
         row.Controls.Add(_btnApacheStart);
         row.Controls.Add(_btnApacheStop);
         row.Controls.Add(_btnApacheRestart);
@@ -315,8 +321,8 @@ public sealed class MainForm : Form
         _btnDbRestart.Text = "รีสตาร์ท";
         _btnDbStart.Width = _btnDbStop.Width = _btnDbRestart.Width = 92;
         _btnDbStart.Click += (s, e) => RunAsync("เริ่ม MariaDB", _stack.StartMariaDb);
-        _btnDbStop.Click += (s, e) => RunAsync("หยุด MariaDB", _stack.StopMariaDb);
-        _btnDbRestart.Click += (s, e) => RunAsync("รีสตาร์ท MariaDB", _stack.RestartMariaDb);
+        _btnDbStop.Click += (s, e) => RunAsync("หยุด MariaDB", _stack.StopMariaDb, "mariadb");
+        _btnDbRestart.Click += (s, e) => RunAsync("รีสตาร์ท MariaDB", _stack.RestartMariaDb, "mariadb");
         row.Controls.Add(_btnDbStart);
         row.Controls.Add(_btnDbStop);
         row.Controls.Add(_btnDbRestart);
@@ -398,6 +404,7 @@ public sealed class MainForm : Form
         RefreshStatuses();
         RunUpdateCheckAsync(); // ตรวจเวอร์ชันใหม่ตอนเปิดโปรแกรม (เบื้องหลัง)
         _backupTimer.Start();  // เริ่มจับเวลาสำรองฐานข้อมูลอัตโนมัติ
+        _watchdogTimer.Start(); // เริ่มตรวจเซอร์วิสล้ม
 
         // จัดเก็บ/บีบอัด log เก่ากว่า LogRetentionDays วัน (ตามค่าตั้ง)
         _ = Task.Run(() =>
@@ -503,13 +510,15 @@ public sealed class MainForm : Form
     }
 
     // ================= การทำงานเบื้องหลัง =================
-    private async void RunAsync(string doing, Action work)
+    /// <param name="watchdogComponents">ชื่อคอมโพเนนต์ที่กำลังถูกสั่งหยุดโดยผู้ใช้ — watchdog จะไม่แจ้งว่า "ล้ม"</param>
+    private async void RunAsync(string doing, Action work, params string[] watchdogComponents)
     {
         if (_busy) return;
         _busy = true;
         UseWaitCursor = true;
         _statusLabel.Text = doing + "… กำลังทำงาน";
         RefreshStatuses();
+        foreach (var comp in watchdogComponents) _watchdogSuppress.Add(comp);
         try
         {
             await Task.Run(work);
@@ -528,11 +537,12 @@ public sealed class MainForm : Form
             _busy = false;
             UseWaitCursor = false;
             RefreshStatuses();
+            foreach (var comp in watchdogComponents) _watchdogSuppress.Remove(comp);
         }
     }
 
     private void StartAll() => RunAsync("เริ่มทั้งหมด (MariaDB → Apache)", _stack.StartAll);
-    private void StopAll() => RunAsync("หยุดทั้งหมด (Apache → MariaDB)", _stack.StopAll);
+    private void StopAll() => RunAsync("หยุดทั้งหมด (Apache → MariaDB)", _stack.StopAll, "apache", "mariadb");
 
     /// <summary>เปิด terminal ที่ www\ พร้อม PATH ชั่วคราวมี php + mariadb\bin</summary>
     private void OpenTerminal()
@@ -673,6 +683,45 @@ public sealed class MainForm : Form
     {
         "apache" => "Apache", "php" => "PHP", "mariadb" => "MariaDB", _ => c,
     };
+
+    // ================= Watchdog เซอร์วิสล้ม =================
+    private void WatchdogTick()
+    {
+        if (_busy) return;
+        CheckWatchdog("apache", _stack.GetApacheStatus(), () => _stack.StartApache());
+        CheckWatchdog("mariadb", _stack.GetMariaDbStatus(), () => _stack.StartMariaDb());
+        _watchdogInitialized = true;
+    }
+
+    private void CheckWatchdog(string comp, ComponentStatus st, Action restart)
+    {
+        bool running = st.State == ComponentState.Running;
+        bool last = _watchdogLastRunning.TryGetValue(comp, out var v) ? v : running;
+        _watchdogLastRunning[comp] = running;
+
+        if (!_watchdogInitialized) return; // ติ๊กแรก — จดสถานะเริ่มต้นไว้ก่อน กันแจ้งเตือนมั่ว
+        if (st.State == ComponentState.NotInstalled) return;
+
+        if (last && !running && st.State == ComponentState.Stopped && !_watchdogSuppress.Contains(comp))
+        {
+            _log.Warn($"Watchdog: ตรวจพบ {comp} หยุดเองโดยไม่มีคนสั่ง");
+            if (_cfg.General.WatchdogAutoRestart)
+            {
+                _tray.ShowBalloonTip(6000, "zServer — เซอร์วิสล้ม!",
+                    CompName(comp) + " หยุดเอง — เริ่มให้ใหม่อัตโนมัติแล้ว", ToolTipIcon.Warning);
+                _ = Task.Run(() =>
+                {
+                    try { restart(); _log.Warn("Watchdog: เริ่ม " + comp + " ใหม่สำเร็จ"); }
+                    catch (Exception ex) { _log.Error("Watchdog: เริ่ม " + comp + " ใหม่ล้มเหลว: " + ex.Message); }
+                });
+            }
+            else
+            {
+                _tray.ShowBalloonTip(6000, "zServer — เซอร์วิสล้ม!",
+                    CompName(comp) + " หยุดเองโดยไม่มีคนสั่ง — เปิดโปรแกรมเพื่อเริ่มใหม่", ToolTipIcon.Warning);
+            }
+        }
+    }
 
     private void OpenFirewall()
     {

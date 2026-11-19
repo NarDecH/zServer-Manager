@@ -12,6 +12,8 @@ public sealed class GeneralSettings
     public bool StartWithWindows { get; set; } = false;
     /// <summary>ใช้ธีมมืด (ค่าเริ่มต้น)</summary>
     public bool DarkTheme { get; set; } = true;
+    /// <summary>ถ้าเซอร์วิสล้มเอง ให้เริ่มใหม่อัตโนมัติ + แจ้งเตือน</summary>
+    public bool WatchdogAutoRestart { get; set; } = false;
     /// <summary>เก็บไฟล์ log ไว้กี่วันก่อนจัดเก็บ/ลบ (0 = ไม่จำกัด)</summary>
     public int LogRetentionDays { get; set; } = 14;
     /// <summary>เวลาที่ตรวจเวอร์ชันใหม่อัตโนมัติครั้งล่าสุด (ใช้กันตรวจถี่เกิน)</summary>

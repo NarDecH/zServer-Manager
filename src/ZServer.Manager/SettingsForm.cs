@@ -97,9 +97,12 @@ public sealed class SettingsForm : Form
     // ทั่วไป
     private readonly CheckBox _chkDarkTheme = new() { Text = "ใช้ธีมมืด (หน้าหลักปรับทันที, หน้าอื่นเมื่อเปิดครั้งถัดไป)" };
     private readonly NumericUpDown _numLogRetention = new() { Minimum = 0, Maximum = 365, Width = 90 };
+    private readonly CheckBox _chkWatchdog = new() { Text = "ตรวจจับเซอร์วิสล้มแล้วเริ่มให้ใหม่อัตโนมัติ (พร้อมแจ้งเตือน)" };
     private readonly CheckBox _chkXdebug = new() { Text = "เปิด Xdebug (debug ผ่าน VS Code)" };
     private readonly NumericUpDown _numXdebugPort = new() { Minimum = 1, Maximum = 65535, Width = 90 };
     private readonly Label _lblXdebugState = new() { AutoSize = true, ForeColor = Color.DimGray };
+    private readonly ComboBox _cboPhpVersion = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 240 };
+    private readonly Button _btnSwitchPhp = new() { Text = "สลับเวอร์ชัน" };
 
     private readonly Downloader _dl;
 
@@ -158,6 +161,7 @@ public sealed class SettingsForm : Form
         AddRow(layoutG, "เมื่อเปิดโปรแกรมนี้", _chkAutoStartServices);
         AddRow(layoutG, "หน้าต่าง", _chkMinimizeToTray);
         AddRow(layoutG, "ธีมหน้าจอ", _chkDarkTheme);
+        AddRow(layoutG, "Watchdog เซอร์วิส", _chkWatchdog);
         AddRow(layoutG, "เก็บไฟล์ log ไว้กี่วัน (0 = ไม่จำกัด)", _numLogRetention);
         AddRow(layoutG, "หมายเหตุ", MakeNote(
             "เปิดอัตโนมัติตอนเข้าสู่ระบบ ทำผ่าน Task Scheduler แบบ Run with highest privileges\n" +
@@ -180,6 +184,7 @@ public sealed class SettingsForm : Form
 
         var tabPhp = new TabPage("PHP");
         var layout2 = MakeTwoColumnLayout();
+        AddRow(layout2, "เวอร์ชัน PHP ที่ใช้งาน (ระบบหลายเวอร์ชัน)", Wrap(_cboPhpVersion, _btnSwitchPhp));
         AddRow(layout2, "memory_limit (หน่วยความจำต่อสคริปต์)", _cboMemory);
         AddRow(layout2, "upload_max_filesize (อัพโหลดไฟล์ใหญ่สุด)", _cboUpload);
         AddRow(layout2, "post_max_size (ข้อมูล POST ใหญ่สุด)", _cboPost);
@@ -255,6 +260,7 @@ public sealed class SettingsForm : Form
         };
         _btnRootPassword.Click += (s, e) => SetRootPasswordFlow();
         _btnMkcert.Click += (s, e) => GenerateHttpsCert();
+        _btnSwitchPhp.Click += (s, e) => SwitchPhpVersion();
         _btnBrowseVhost.Click += (s, e) =>
         {
             using var dlg = new FolderBrowserDialog { SelectedPath = _txtVhostPath.Text };
@@ -336,6 +342,7 @@ public sealed class SettingsForm : Form
         _chkMinimizeToTray.Checked = _cfg.General.MinimizeToTray;
         _chkAutoStartServices.Checked = _cfg.General.AutoStartServices;
         _chkDarkTheme.Checked = _cfg.General.DarkTheme;
+        _chkWatchdog.Checked = _cfg.General.WatchdogAutoRestart;
         var taskOn = StartupHelper.IsEnabled();
         if (taskOn != _cfg.General.StartWithWindows)
         {
@@ -372,6 +379,7 @@ public sealed class SettingsForm : Form
         _chkOpCache.Checked = p.OpCache;
         _cboTimezone.Text = p.Timezone;
         BuildExtensionsPanel();
+        FillPhpVersions();
         _chkXdebug.Checked = p.XdebugEnabled;
         _numXdebugPort.Value = Clamp(p.XdebugPort, 1, 65535);
         UpdateXdebugState();
@@ -582,6 +590,7 @@ public sealed class SettingsForm : Form
             _cfg.General.StartWithWindows = _chkStartWithWindows.Checked;
             _cfg.General.LogRetentionDays = (int)_numLogRetention.Value;
             _cfg.General.DarkTheme = _chkDarkTheme.Checked;
+            _cfg.General.WatchdogAutoRestart = _chkWatchdog.Checked;
             Theme.Dark = _chkDarkTheme.Checked;
             Theme.Apply(this);
 
@@ -728,6 +737,78 @@ public sealed class SettingsForm : Form
         {
             _btnBackupNow.Enabled = true;
             UpdateBackupState();
+        }
+    }
+
+    // ================= สลับเวอร์ชัน PHP (ระบบหลายเวอร์ชัน) =================
+    private void FillPhpVersions()
+    {
+        _cboPhpVersion.Items.Clear();
+        foreach (var v in PhpVersionManager.ListVersions(_paths))
+            _cboPhpVersion.Items.Add(v);
+        var active = PhpVersionManager.ActiveVersion(_paths);
+        if (active != null && _cboPhpVersion.Items.Contains(active))
+            _cboPhpVersion.SelectedItem = active;
+    }
+
+    private async void SwitchPhpVersion()
+    {
+        var ver = _cboPhpVersion.SelectedItem as string;
+        if (string.IsNullOrEmpty(ver))
+        {
+            MessageBox.Show("ยังไม่มีเวอร์ชัน PHP ในระบบหลายเวอร์ชัน — ติดตั้ง PHP ผ่านหน้า \"ติดตั้ง\" ก่อน (โปรแกรมจะย้ายเข้าระบบให้เอง)",
+                "ตรวจสอบ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        var active = PhpVersionManager.ActiveVersion(_paths);
+        if (ver == active)
+        {
+            MessageBox.Show("ใช้เวอร์ชัน " + ver + " อยู่แล้ว", "แจ้งทราบ",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        if (!File.Exists(_paths.ApacheBin))
+        {
+            MessageBox.Show("ยังไม่ได้ติดตั้ง Apache", "ตรวจสอบ",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var stack = new StackController(_paths, _cfg, _log);
+        var wasRunning = stack.GetApacheStatus().State == ComponentState.Running;
+        if (MessageBox.Show(
+            $"สลับ PHP จาก {active ?? "?"} เป็น {ver}?\n" +
+            (wasRunning ? "Apache จะหยุดชั่วคราวแล้วเริ่มใหม่ให้อัตโนมัติ" : "Apache ปัจจุบันไม่ได้รันอยู่ (จะเขียน config ให้อย่างเดียว)"),
+            "ยืนยันการสลับ", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            return;
+
+        _btnSwitchPhp.Enabled = false;
+        UseWaitCursor = true;
+        try
+        {
+            if (wasRunning) stack.StopApache();
+            PhpVersionManager.SwitchTo(_paths, ver, _log);
+            _cw.WritePhpIni(); // เขียน config ผ่าน junction → เข้าเวอร์ชันที่สลับไป
+            if (_cfg.PhpInstalled != null)
+            {
+                _cfg.PhpInstalled.Version = ver;
+                _cfg.Save(_paths);
+            }
+            if (wasRunning) stack.StartApache();
+            _log.Info("สลับเวอร์ชัน PHP เป็น " + ver + " สำเร็จ");
+            MessageBox.Show($"สลับเป็น PHP {ver} เรียบร้อย ✓\nตรวจผลที่ phpinfo.php ได้เลย",
+                "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            FillPhpVersions();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("สลับเวอร์ชันไม่สำเร็จ:\n" + ex.Message, "ผิดพลาด",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            _btnSwitchPhp.Enabled = true;
+            UseWaitCursor = false;
         }
     }
 

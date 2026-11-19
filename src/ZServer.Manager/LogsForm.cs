@@ -13,6 +13,7 @@ public sealed class LogsForm : Form
     private readonly ComboBox _cboLog = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 380 };
     private readonly TextBox _txtLog = new();
     private readonly Button _btnRefresh = new() { Text = "รีเฟรช" };
+    private readonly Button _btnStats = new() { Text = "สรุปสถิติ access.log" };
     private readonly Button _btnOpenFolder = new() { Text = "เปิดโฟลเดอร์ logs" };
     private readonly Button _btnClear = new() { Text = "ล้างไฟล์นี้" };
     private readonly CheckBox _chkAuto = new() { Text = "รีเฟรชอัตโนมัติ (ทุก 3 วิ)", Checked = true };
@@ -43,6 +44,7 @@ public sealed class LogsForm : Form
         top.Controls.Add(_cboLog);
         top.Controls.Add(_btnRefresh);
         top.Controls.Add(_chkAuto);
+        top.Controls.Add(_btnStats);
         top.Controls.Add(_btnOpenFolder);
         top.Controls.Add(_btnClear);
 
@@ -66,6 +68,11 @@ public sealed class LogsForm : Form
 
         _cboLog.SelectedIndexChanged += (s, e) => LoadLog();
         _btnRefresh.Click += (s, e) => LoadLog();
+        _btnStats.Click += (s, e) =>
+        {
+            var f = new AccessSummaryForm(_paths, _cfg) { StartPosition = FormStartPosition.CenterParent };
+            f.Show(this);
+        };
         _btnOpenFolder.Click += (s, e) =>
         {
             try { System.Diagnostics.Process.Start("explorer.exe", "\"" + _paths.LogsDir + "\""); } catch { }

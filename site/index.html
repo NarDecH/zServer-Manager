@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>zServer Manager — ควบคุม Apache / PHP / MariaDB บน Windows ในที่เดียว</title>
+<meta name="description" content="โปรแกรมโอเพนซอร์ส (MIT) สำหรับติดตั้ง ตั้งค่า อัพเดท เปิด-ปิดเซอร์วิส Apache, PHP, MariaDB บน Windows — พร้อมฐานข้อมูล wizard, Virtual Hosts, HTTPS, สำรองข้อมูลอัตโนมัติ และธีมมืด ภาษาไทยทั้งหมด">
+<link rel="icon" type="image/png" href="logo.png">
+<style>
+:root{
+  --bg:#0b1220; --bg2:#0f1728; --card:#121a2d; --card2:#16203a;
+  --border:#22304f; --border2:#2e3f66;
+  --fg:#e8eefb; --dim:#9db0d3; --dim2:#7189b3;
+  --cyan:#22d3ee; --green:#34d399; --blue:#60a5fa; --violet:#a78bfa;
+  --amber:#fbbf24; --red:#f87171;
+  --grad:linear-gradient(120deg,#22d3ee,#34d399);
+  --radius:16px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:"Segoe UI",Tahoma,-apple-system,sans-serif;
+  background:var(--bg); color:var(--fg); line-height:1.75;
+  overflow-x:hidden;
+}
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(900px 500px at 85% -10%, rgba(34,211,238,.09), transparent 60%),
+    radial-gradient(900px 500px at 0% 30%, rgba(52,211,153,.07), transparent 60%);
+}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+
+/* ===== nav ===== */
+nav{
+  position:sticky;top:0;z-index:50;
+  background:rgba(11,18,32,.82);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+}
+nav .wrap{display:flex;align-items:center;gap:20px;height:64px}
+nav img{height:34px;width:auto;border-radius:8px}
+nav .brand{font-weight:700;font-size:1.06rem;letter-spacing:.2px;margin-right:auto;display:flex;align-items:center;gap:10px;color:var(--fg);text-decoration:none}
+nav a{color:var(--dim);text-decoration:none;font-size:.95rem;transition:color .2s}
+nav a:hover{color:var(--fg)}
+nav .cta{background:var(--grad);color:#062033;font-weight:700;padding:9px 20px;border-radius:10px}
+nav .cta:hover{filter:brightness(1.1);color:#062033}
+@media(max-width:760px){nav a:not(.cta){display:none}}
+
+/* ===== hero ===== */
+.hero{padding:76px 0 40px;display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
+@media(max-width:860px){.hero{grid-template-columns:1fr;padding-top:48px}}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.badges img{height:20px;border-radius:4px}
+h1{font-size:clamp(2.1rem,4.6vw,3.3rem);line-height:1.15;letter-spacing:-.5px}
+h1 .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tagline{color:var(--dim);font-size:1.14rem;margin:18px 0 8px;max-width:34em}
+.sub{color:var(--dim2);font-size:.98rem}
+.cta-row{display:flex;gap:14px;margin-top:28px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:13px 26px;border-radius:12px;font-weight:700;font-size:1rem;text-decoration:none;transition:.22s;border:1px solid transparent;cursor:pointer}
+.btn.primary{background:var(--grad);color:#062033;box-shadow:0 8px 30px rgba(34,211,238,.28)}
+.btn.primary:hover{transform:translateY(-2px);box-shadow:0 12px 38px rgba(34,211,238,.4)}
+.btn.ghost{border-color:var(--border2);color:var(--fg)}
+.btn.ghost:hover{border-color:var(--cyan);color:var(--cyan)}
+.hero-art{position:relative}
+.hero-art img{width:100%;border-radius:20px;border:1px solid var(--border);box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.glow{position:absolute;inset:-30px;background:radial-gradient(60% 60% at 60% 40%,rgba(34,211,238,.18),transparent 70%);z-index:-1;filter:blur(10px)}
+
+/* ===== dashboard mockup ===== */
+.mock{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-top:20px;font-size:.82rem}
+.mock .bar{display:flex;gap:7px;padding:11px 14px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.mock .bar i{width:11px;height:11px;border-radius:50%;display:block}
+.mock .bar i:nth-child(1){background:#ff5f57}.mock .bar i:nth-child(2){background:#febc2e}.mock .bar i:nth-child(3){background:#28c840}
+.mock .title{color:var(--dim2);font-size:.72rem;flex:1;text-align:center}
+.mock .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px}
+.mock .mc{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.mock .mc b{font-size:.86rem}
+.mock .st{font-size:.78rem;font-weight:700}
+.mock .st.g{color:var(--green)}.mock .st.o{color:var(--amber)}
+.mock .mc small{color:var(--dim2);display:block;margin:2px 0 8px}
+.mock .mbtns{display:flex;gap:6px}
+.mock .mbtn{flex:1;text-align:center;padding:4px 0;border-radius:6px;background:var(--border);color:var(--dim)}
+.mock .mbtn.g{background:#1e8e3e;color:#fff;font-weight:700}
+.mock .actions{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 14px}
+.mock .actions span{padding:5px 10px;border-radius:7px;background:var(--card2);border:1px solid var(--border);color:var(--dim);font-size:.72rem}
+.mock .term{margin:0 14px 14px;background:#0c1018;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:Consolas,monospace;color:#7ee2a8;font-size:.74rem;line-height:1.6}
+.mock .term b{color:var(--cyan);font-weight:400}
+
+/* ===== sections ===== */
+section{padding:72px 0}
+.eyebrow{color:var(--cyan);font-weight:700;font-size:.85rem;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:10px}
+h2{font-size:clamp(1.6rem,3vw,2.2rem);letter-spacing:-.4px;margin-bottom:14px}
+.lead{color:var(--dim);max-width:46em;margin-bottom:36px}
+
+/* ===== feature grid ===== */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px;transition:.25s;position:relative;overflow:hidden
+}
+.card:hover{transform:translateY(-4px);border-color:var(--border2);box-shadow:0 16px 44px rgba(0,0,0,.4)}
+.card .ic{
+  width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  margin-bottom:14px;background:linear-gradient(135deg,rgba(34,211,238,.16),rgba(52,211,153,.16));
+  border:1px solid rgba(34,211,238,.3)
+}
+.card .ic svg{width:22px;height:22px;stroke:var(--cyan);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.card h3{font-size:1.04rem;margin-bottom:8px}
+.card p{color:var(--dim);font-size:.92rem}
+
+/* ===== components strip ===== */
+.strip{
+  display:flex;gap:12px;flex-wrap:wrap;justify-content:center;
+  margin-top:8px
+}
+.chip{
+  display:flex;align-items:center;gap:10px;background:var(--card);
+  border:1px solid var(--border);border-radius:999px;padding:10px 22px;font-weight:600;font-size:.95rem
+}
+.chip i{width:9px;height:9px;border-radius:50%;display:block;background:var(--green);box-shadow:0 0 10px var(--green)}
+.chip small{color:var(--dim2);font-weight:400}
+
+/* ===== steps ===== */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:s}
+@media(max-width:800px){.steps{grid-template-columns:1fr}}
+.step{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:26px;position:relative}
+.step::before{
+  counter-increment:s;content:counter(s);
+  position:absolute;top:-16px;left:24px;width:38px;height:38px;border-radius:11px;
+  background:var(--grad);color:#062033;font-weight:800;font-size:1.1rem;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(34,211,238,.3)
+}
+.step h3{margin:14px 0 8px;font-size:1.05rem}
+.step p{color:var(--dim);font-size:.93rem}
+
+/* ===== install ===== */
+.code{
+  background:#0c1018;border:1px solid var(--border);border-radius:12px;
+  padding:18px 22px;font-family:Consolas,"Cascadia Mono",monospace;font-size:.88rem;
+  color:#c9d6ef;line-height:1.8;overflow-x:auto;white-space:pre
+}
+.code .c{color:#5b739e}
+.code .g{color:var(--green)}
+.methods{display:grid;grid-template-columns:1fr;gap:18px;max-width:820px}
+.method{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px 26px}
+.method h3{font-size:1.02rem;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.method h3 .tag{font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(52,211,153,.14);color:var(--green);border:1px solid rgba(52,211,153,.3)}
+.method p{color:var(--dim);font-size:.92rem;margin-bottom:12px}
+
+/* ===== docs grid ===== */
+.dgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:900px){.dgrid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.dgrid{grid-template-columns:1fr}}
+.doc{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;
+  text-decoration:none;color:var(--fg);transition:.22s;display:block
+}
+.doc:hover{border-color:var(--cyan);transform:translateY(-3px)}
+.doc b{display:block;margin-bottom:4px;font-size:.98rem}
+.doc span{color:var(--dim2);font-size:.82rem}
+
+/* ===== FAQ ===== */
+details{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:18px 22px;margin-bottom:12px
+}
+details[open]{border-color:var(--border2)}
+summary{cursor:pointer;font-weight:700;list-style:none;display:flex;align-items:center;gap:12px}
+summary::before{content:"?";width:26px;height:26px;border-radius:8px;background:rgba(34,211,238,.14);border:1px solid rgba(34,211,238,.3);color:var(--cyan);display:flex;align-items:center;justify-content:center;font-size:.9rem;flex:none}
+details p{color:var(--dim);margin-top:12px;font-size:.94rem}
+details code{background:#0c1018;padding:2px 8px;border-radius:6px;font-size:.85rem}
+
+/* ===== footer ===== */
+footer{border-top:1px solid var(--border);padding:44px 0 60px;text-align:center;color:var(--dim2);font-size:.9rem}
+footer .fp{display:flex;gap:16px;justify-content:center;margin:14px 0 18px;flex-wrap:wrap}
+footer a{color:var(--dim);text-decoration:none}
+footer a:hover{color:var(--cyan)}
+footer .made{margin-top:10px}
+footer .heart{color:var(--red)}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><img src="logo.png" alt="logo"> zServer <span style="color:var(--cyan)">Manager</span></a>
+    <a href="#features">ฟีเจอร์</a>
+    <a href="#start">เริ่มใช้งาน</a>
+    <a href="#install">ติดตั้ง</a>
+    <a href="#docs">เอกสาร</a>
+    <a href="#faq">ถาม-ตอบ</a>
+    <a class="cta" href="https://github.com/NarDech/zServer-Manager/releases/latest">ดาวน์โหลด</a>
+  </div>
+</nav>
+
+<header class="wrap hero">
+  <div>
+    <div class="badges">
+      <img src="https://img.shields.io/github/v/release/NarDech/zServer-Manager?label=release&color=2ea44f" alt="release">
+      <img src="https://img.shields.io/github/actions/workflow/status/NarDech/zServer-Manager/build.yml?label=build" alt="build">
+      <img src="https://img.shields.io/github/downloads/NarDech/zServer-Manager/total?label=downloads&color=blue" alt="downloads">
+      <img src="https://img.shields.io/github/license/NarDecH/zServer-Manager?color=orange" alt="MIT">
+    </div>
+    <h1>เว็บเซิร์ฟเวอร์บน Windows<br>ที่<span class="grad">กดปุ่มแล้วพร้อมใช้</span></h1>
+    <p class="tagline">ติดตั้ง Apache + PHP + MariaDB จากเว็บทางการด้วยคลิกเดียว ตั้งค่าครบ สลับ PHP หลายเวอร์ชัน สร้างเว็บใหม่จากเทมเพลต สำรองข้อมูลอัตโนมัติ และ HTTPS ที่ browser เชื่อ — ภาษาไทยทั้งหมด โอเพนซอร์ส (MIT)</p>
+    <p class="sub">ไม่ต้องติดตั้ง .NET · ไฟล์เดียวจบ · ไม่แตะ XAMPP เดิมของคุณ</p>
+    <div class="cta-row">
+      <a class="btn primary" href="https://github.com/NarDecH/zServer-Manager/releases/latest">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10m0 0l4-4m-4 4L8 9M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke="#062033" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        ดาวน์โหลด Setup.exe
+      </a>
+      <a class="btn ghost" href="#start">เริ่มใช้งานใน 3 ขั้น</a>
+      <a class="btn ghost" href="https://github.com/NarDecH/zServer-Manager">GitHub</a>
+    </div>
+  </div>
+  <div class="hero-art">
+    <div class="glow"></div>
+    <img src="logo.png" alt="zServer Manager logo">
+  </div>
+</header>
+
+<!-- ===== dashboard mockup ===== -->
+<section class="wrap" style="padding-top:0">
+  <div class="eyebrow">หน้าตาโปรแกรม</div>
+  <h2>แดชบอร์ดที่ควบคุมทุกอย่าง</h2>
+  <p class="lead">สถานะเรียลไทม์ทุก 3 วินาที · ปุ่มควบคุมครบ · log สดเลื่อนอัตโนมัติ · watchdog จับเซอร์วิสล้ม · ธีมมืด/สว่างสลับได้จาก tray</p>
+  <div class="mock">
+    <div class="bar"><i></i><i></i><i></i><span class="title">zServer Manager — ควบคุม Apache / PHP / MariaDB</span></div>
+    <div class="cards">
+      <div class="mc"><b>Apache</b> <span class="st g">● กำลังทำงาน</span><small>เวอร์ชัน 2.4.71 · พอร์ต 80/443</small><div class="mbtns"><span class="mbtn g">เริ่ม</span><span class="mbtn">หยุด</span><span class="mbtn">รีสตาร์ท</span></div></div>
+      <div class="mc"><b>PHP</b> <span class="st g">● กำลังทำงาน</span><small>เวอร์ชัน 8.5.13 · สลับ 8.6.0 ได้</small><div class="mbtns"><span class="mbtn">เปิด phpinfo</span></div></div>
+      <div class="mc"><b>MariaDB</b> <span class="st g">● กำลังทำงาน</span><small>เวอร์ชัน 11.8.6 · พอร์ต 3306</small><div class="mbtns"><span class="mbtn g">เริ่ม</span><span class="mbtn">หยุด</span><span class="mbtn">รีสตาร์ท</span></div></div>
+    </div>
+    <div class="actions">
+      <span>ติดตั้งคอมโพเนนต์</span><span>อัพเดท</span><span>ตั้งค่า</span><span>แก้ไขไฟล์ Config</span><span>ฐานข้อมูล</span><span>เว็บใหม่</span><span>ดู Logs</span><span>HTTPS</span><span>เปิด Terminal</span>
+    </div>
+    <div class="term">
+      <b>[Apache]</b> เขียน httpd.conf เรียบร้อย (พอร์ต 80)<br>
+      <b>[MariaDB]</b> สำรองฐานข้อมูลอัตโนมัติสำเร็จ: backups\databases\all-20261120.sql (12.4 MB)<br>
+      <b>[Watchdog]</b> ทุกเซอร์วิสกำลังทำงานปกติ ✓
+    </div>
+  </div>
+</section>
+
+<!-- ===== features ===== -->
+<section id="features" class="wrap">
+  <div class="eyebrow">ฟีเจอร์</div>
+  <h2>12 ความสามารถหลัก ในไฟล์เดียว</h2>
+  <p class="lead">ทุกอย่างที่ต้องใช้พัฒนาเว็บบนเครื่อง Windows — ไม่ต้องเปิดหลายโปรแกรม ไม่ต้องจำคำสั่ง ภาษาไทยทั้งหมด</p>
+  <div class="grid">
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v10m0 0l4-4m-4 4L8 9M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg></div><h3>ติดตั้งคลิกเดียว</h3><p>ดาวน์โหลด Apache / PHP / MariaDB จากเว็บทางการ ตรวจ SHA256 แตกไฟล์ เขียน config เชื่อมกันเอง ติดตั้งเป็น Windows Service — บวก Adminer จัดการฐานข้อมูลผ่านเว็บ</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="2.6"/><path d="M4 5v6c0 1.4 3.6 2.6 8 2.6s8-1.2 8-2.6V5M4 11v6c0 1.4 3.6 2.6 8 2.6s8-1.2 8-2.6v-6"/></svg></div><h3>สลับ PHP หลายเวอร์ชัน</h3><p>เก็บได้หลายเวอร์ชัน (8.5 / 8.6 …) สลับใน 3 วินาทีผ่านระบบ junction — ไม่ต้องโหลดซ้ำ ไม่ต้องแก้ config</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div><h3>แจ้งเตือน + อัพเดทอัตโนมัติ</h3><p>ตรวจเวอร์ชันใหม่จากเว็บทางการทุก 6 ชม. เจอของใหม่เด้งแจ้งเตือน tray — กดอัพเดทได้เลย สำรองก่อนเสมอ rollback ได้</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><circle cx="19" cy="17" r="2.2"/></svg></div><h3>ฐานข้อมูลในคลิกเดียว</h3><p>สร้าง database + user + grant พร้อม connection string คัดลอกไปวางในโค้ดได้ทันที — บวกสำรองข้อมูลอัตโนมัติทุกวัน</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></div><h3>Virtual Hosts หลายเว็บ</h3><p>เพิ่ม myproject.local ในไม่กี่คลิก — โปรแกรมสร้าง vhost config + แก้ hosts file ให้เอง (สำรองเดิมก่อนทุกครั้ง)</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>HTTPS ง่ายสุด ๆ</h3><p>ใบรับรอง dev ด้วย mkcert (browser เชื่อไม่เตือน) หรือนำเข้าใบรับรองจริงที่ซื้อมา .crt/.key/.pfx — ตรวจ key ตรง cert ให้อัตโนมัติ ครอบคลุมทุกเว็บ</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 11-9-9"/><path d="M21 3l-9 9"/><path d="M16 3h5v5"/></svg></div><h3>สร้างเว็บจากเทมเพลต</h3><p>เว็บเปล่า หรือ WordPress ดาวน์โหลดให้พร้อม database + user + โดเมน — จบใน 2 นาที ไม่ต้องเปิด phpMyAdmin</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M13 3l-8 8h6l-2 8 8-10h-6l2-6z"/></svg></div><h3>Watchdog เซอร์วิสล้ม</h3><p>ตรวจทุก 30 วินาที — เซอร์วิสตายเองเด้งแจ้งทันที เปิดโหมดเริ่มให้ใหม่อัตโนมัติได้ (ไม่นับตอนผู้ใช้กดหยุดเอง)</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M8 8h.01M12 8h.01M16 8h.01M8 12h.01M12 12h.01"/></svg></div><h3>ตั้งค่าครบ ภาษาไทย</h3><p>พอร์ต, DocumentRoot, memory_limit, extensions (พร้อมคำอธิบาย), Xdebug, MariaDB, autostart — บันทึกทีเดียวสำรองไฟล์เดิมให้ก่อนเสมอ</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><path d="M14 3v5h5M14 3h5v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2h7z"/><path d="M9 13l2 2 4-4"/></svg></div><h3>Log + สถิติ + Rotation</h3><p>ดู log ทุกตัวในโปรแกรม สรุปสถิติ access.log (Top IP/หน้าเว็บ/status) log เก่าบีบอัดเก็บอัตโนมัติ ตั้งเก็บไว้กี่วันได้</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/><path d="M7 9l3 3-3 3"/></svg></div><h3>Terminal พร้อม PATH</h3><p>เปิด cmd ที่โฟลเดอร์เว็บ มี php + mariadb ใน PATH ทันที — รัน migration, composer, dump ได้เลย</p></div>
+    <div class="card"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg></div><h3>ธีมมืด/สว่าง + autostart</h3><p>สลับธีมจาก tray, เปิดโปรแกรมเองตอน logon พร้อมสิทธิ์ admin ไม่เด้ง UAC, ย่อไป tray ได้</p></div>
+  </div>
+</section>
+
+<!-- ===== components ===== -->
+<section class="wrap" style="padding-top:0">
+  <div class="eyebrow">คอมโพเนนต์</div>
+  <h2>ของจริงจากเว็บทางการ เวอร์ชันล่าสุดอัตโนมัติ</h2>
+  <p class="lead">รายการเวอร์ชันดึงสดจาก php.net / ApacheLounge / MariaDB archive ทุกครั้งที่เปิดหน้าติดตั้ง — เวอร์ชันใหม่ที่ออกทีหลังโปรแกรมจะรู้เอง</p>
+  <div class="strip">
+    <span class="chip"><i></i>Apache <small>2.4.71 · VS18</small></span>
+    <span class="chip"><i></i>PHP <small>8.6.0 / 8.5.13 / 8.4.28 (TS)</small></span>
+    <span class="chip"><i></i>MariaDB <small>11.8.6 / 11.4.10 (LTS)</small></span>
+    <span class="chip"><i></i>Adminer <small>ล่าสุดจาก adminer.org</small></span>
+    <span class="chip"><i></i>mkcert <small>v1.4.4</small></span>
+  </div>
+</section>
+
+<!-- ===== quick start ===== -->
+<section id="start" class="wrap">
+  <div class="eyebrow">เริ่มใช้งาน</div>
+  <h2>3 ขั้นตอน แล้วเว็บพร้อมใช้</h2>
+  <p class="lead">จากดับเบิลคลิกไฟล์เดียว ถึง https://localhost ที่ browser เชื่อ — ไม่ต้องจำคำสั่งสักคำสั่ง</p>
+  <div class="steps">
+    <div class="step"><h3>ดับเบิลคลิก Setup.exe</h3><p>ติดตั้งลง C:\zServer พร้อม shortcut — ตัวโปรแกรมเป็น single-file self-contained ไม่ต้องติดตั้ง .NET หรือโปรแกรมอื่นก่อน</p></div>
+    <div class="step"><h3>กดติดตั้ง 3 คอมโพเนนต์</h3><p>Apache → PHP → MariaDB โปรแกรมดาวน์โหลดจากเว็บทางการ ตรวจ SHA256 เขียน config เชื่อมกัน ติดตั้ง Windows Service และ Adminer ให้ครบ</p></div>
+    <div class="step"><h3>กด "เริ่มทั้งหมด"</h3><p>เว็บเปิดที่ localhost, HTTPS ที่ 443, ฐานข้อมูลที่ 3306 — สร้างเว็บใหม่เพิ่มได้จากปุ่ม "เว็บใหม่" (WordPress ก็ได้)</p></div>
+  </div>
+</section>
+
+<!-- ===== install ===== -->
+<section id="install" class="wrap">
+  <div class="eyebrow">ติดตั้ง</div>
+  <h2>เลือกวิธีที่ถนัด</h2>
+  <p class="lead">ทั้ง 3 วิธีใช้โค้ดชุดเดียวกัน — Setup.exe สำหรับทั่วไป, ใช้ตรงแบบ portable, CLI สำหรับ automation</p>
+  <div class="methods">
+    <div class="method">
+      <h3>Setup.exe <span class="tag">แนะนำ</span></h3>
+      <p>ดับเบิลคลิก → Next → จบ: ติดตั้งลง C:\zServer + shortcut + คู่มือ offline — ถอนผ่าน Control Panel ได้ (ไม่ลบข้อมูลผู้ใช้)</p>
+      <a class="btn primary" href="https://github.com/NarDecH/zServer-Manager/releases/latest" style="padding:10px 20px;font-size:.92rem">โหลด zServer-Setup.exe</a>
+    </div>
+    <div class="method">
+      <h3>ใช้ตรง (portable)</h3>
+      <p>วางโฟลเดอร์ → ดับเบิลคลิก exe — โปรแกรมหา root เองอัตโนมัติ ลบโฟลเดอร์ทิ้งก็ถอนจบ</p>
+    </div>
+    <div class="method">
+      <h3>Command line (scripting)</h3>
+      <div class="code"><span class="c"># ติดตั้งทั้ง 3 ตัว + เริ่มเซอร์วิส (cmd แบบ admin)</span>
+ZServer.Installer.exe apache php mariadb <span class="g">--start</span>
+
+<span class="c"># เวอร์ชันเฉพาะ / ไม่ติดตั้งเซอร์วิส</span>
+ZServer.Installer.exe php <span class="g">--version=8.6.0</span>
+ZServer.Installer.exe mariadb <span class="g">--no-service</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== docs ===== -->
+<section id="docs" class="wrap">
+  <div class="eyebrow">เอกสาร</div>
+  <h2>คู่มือภาษาไทย ละเอียดทุกขั้นตอน</h2>
+  <p class="lead">มาพร้อมโปรแกรมในโฟลเดอร์ docs\ — เปิดจากปุ่ม "คู่มือการใช้งาน" บนหน้าหลักได้เลย</p>
+  <div class="dgrid">
+    <a class="doc" href="https://github.com/NarDecH/zServer-Manager/blob/main/docs/INSTALL_TH.md"><b>📦 คู่มือติดตั้ง</b><span>Setup.exe / ใช้ตรง / CLI / autostart / ถอนติดตั้ง</span></a>
+    <a class="doc" href="https://github.com/NarDecH/zServer-Manager/blob/main/docs/USER_GUIDE_TH.md"><b>📖 คู่มือการใช้งาน</b><span>ทุกหน้าจอ ทุกปุ่ม + 12 workflow ละเอียด</span></a>
+    <a class="doc" href="https://github.com/NarDecH/zServer-Manager/blob/main/docs/CONFIG_REFERENCE_TH.md"><b>⚙️ อ้างอิง Config</b><span>zserver.json ทุก field + ไฟล์ config ทุกไฟล์</span></a>
+    <a class="doc" href="https://github.com/NarDecH/zServer-Manager/blob/main/docs/TROUBLESHOOTING_TH.md"><b>🔧 แก้ปัญหา</b><span>พอร์ตชน / HTTPS / สลับ PHP / backup ฯลฯ</span></a>
+    <a class="doc" href="https://github.com/NarDecH/zServer-Manager/blob/main/docs/ARCHITECTURE_TH.md"><b>🏗️ สถาปัตยกรรม</b><span>โครงสร้างโค้ดสำหรับผู้พัฒนาต่อ</span></a>
+    <a class="doc" href="https://github.com/NarDecH/zServer-Manager/blob/main/docs/README_TH.md"><b>🗺️ ภาพรวม</b><span>โครงสร้างโฟลเดอร์ + เทคโนโลยี</span></a>
+    <a class="doc" href="https://github.com/NarDecH/zServer-Manager/blob/main/docs/CHANGELOG.md"><b>📜 CHANGELOG</b><span>ประวัติเวอร์ชัน 1.0.0 → 1.6.0</span></a>
+    <a class="doc" href="https://github.com/NarDecH/zServer-Manager"><b>🐙 GitHub</b><span>ซอร์สโค้ด + CI build อัตโนมัติ + Releases</span></a>
+  </div>
+</section>
+
+<!-- ===== FAQ ===== -->
+<section id="faq" class="wrap">
+  <div class="eyebrow">ถาม-ตอบ</div>
+  <h2>คำถามที่พบบ่อย</h2>
+  <details open><summary>ใช้คู่กับ XAMPP ที่ติดตั้งไว้แล้วได้ไหม?</summary><p>ได้ และไม่กระทบกันเลย — ถ้า XAMPP กำลังรันอยู่ โปรแกรมจะตรวจพอร์ตชนและแจ้งว่าใครใช้ พร้อมปุ่มเปลี่ยนพอร์ตเป็น 8080/3307 อัตโนมัติ หรือจะหยุด XAMPP แล้วใช้พอร์ต 80/3306 กับ zServer ก็ได้</p></details>
+  <details><summary>สลับเวอร์ชัน PHP ยังไง?</summary><p>ติดตั้งเวอร์ชันที่ต้องการผ่านหน้า "ติดตั้ง" ครั้งเดียว — โปรแกรมเก็บไว้ที่ php-versions\ จากนั้นไปที่ ตั้งค่า → PHP → เลือกเวอร์ชัน → กดสลับ (Apache หยุด-เริ่มให้อัตโนมัติ ใช้เวลาไม่กี่วินาที) — กลับมาเวอร์ชันเดิมเมื่อไรก็ได้</p></details>
+  <details><summary>HTTPS ใช้ใบรับรองจากไหน?</summary><p>สำหรับพัฒนางาน: โปรแกรมใช้ mkcert สร้างใบรับรอง + ติดตั้ง CA เข้า Windows — Chrome/Edge เชื่อทันทีไม่มีคำเตือน ครอบคลุม localhost และ Virtual Host ทุกตัว ส่วนเว็บจริงบน server สามารถนำเข้าใบรับรองจริงที่ซื้อมา (.crt/.key/.pfx) ผ่านปุ่มในหน้าเดียวกันได้</p></details>
+  <details><summary>ทำไมต้องกด UAC ทุกครั้งตอนเปิดโปรแกรม?</summary><p>โปรแกรมควบคุม Windows Service และ hosts file ซึ่งต้องการสิทธิ์ admin — ถ้าไม่อยากกดบ่อย ใช้ตัวเลือก "เปิดโปรแกรมอัตโนมัติเมื่อเข้าสู่ระบบ" ในหน้าตั้งค่า (Task Scheduler ให้สิทธิ์ admin โดยไม่เด้ง UAC ตอน logon)</p></details>
+  <details><summary>ข้อมูลหายไหมตอนอัพเดท/ถอนติดตั้ง?</summary><p>ไม่หาย — ทุกการอัพเดท/ติดตั้งทับจะสำรองโฟลเดอร์เดิมลง backups\ ก่อนเสมอ, ข้อมูลฐานข้อมูลอยู่ที่ data\ แยกจากโฟลเดอร์โปรแกรม, ถอน Setup.exe จะลบเฉพาะไฟล์โปรแกรม (ไม่ลบ www\, data\, เซอร์วิส)</p></details>
+  <details><summary>โอเพนซอร์สไหม?</summary><p>ใช่ — License แบบ MIT ทั้งโปรเจกต์ ซอร์สโค้ด C# อยู่ในโฟลเดอร์ src\ บน GitHub พร้อม CI build อัตโนมัติทุก push</p></details>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a href="#"><img src="logo.png" alt="logo" style="height:40px;border-radius:9px"></a>
+    <div class="fp">
+      <a href="https://github.com/NarDecH/zServer-Manager">GitHub</a>
+      <a href="https://github.com/NarDecH/zServer-Manager/releases">Releases</a>
+      <a href="https://github.com/NarDecH/zServer-Manager/blob/main/docs/USER_GUIDE_TH.md">คู่มือ</a>
+      <a href="https://github.com/NarDecH/zServer-Manager/blob/main/LICENSE">MIT License</a>
+    </div>
+    <div>© 2026 zServer Manager — โอเพนซอร์สภายใต้สัญญาอนุญาต MIT</div>
+    <div class="made">สร้างด้วย <span class="heart">♥</span> และ C# / .NET 10 · Apache · PHP · MariaDB</div>
+  </div>
+</footer>
+
+</body>
+</html>

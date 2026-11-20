@@ -7,6 +7,8 @@
 
 ![zServer Manager](docs/banner.png)
 
+**🌐 เว็บไซต์โปรเจกต์: [nardech.github.io/zServer-Manager](https://nardech.github.io/zServer-Manager/)**
+
 โปรแกรมควบคุม **Apache / PHP / MariaDB** บน Windows ในที่เดียว — ติดตั้ง ตั้งค่า อัพเดท เปิด-ปิดเซอร์วิส สร้างเว็บ จัดการฐานข้อมูล และ HTTPS ได้ครบในโปรแกรมเดียว (ภาษาไทยทั้งหมด)
 
 ## โปรแกรมหลัก

@@ -17,7 +17,6 @@
   --radius:16px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
 body{
   font-family:"Segoe UI",Tahoma,-apple-system,sans-serif;
   background:var(--bg); color:var(--fg); line-height:1.75;
@@ -179,6 +178,13 @@ footer a:hover{color:var(--cyan)}
 footer .made{margin-top:10px}
 footer .heart{color:var(--red)}
 </style>
+<script>
+// smooth scroll เฉพาะตอนคลิกลิงก์ anchor (ไม่ใช่ global CSS — กัน screenshot/scroll ทั่วไปผิดพฤติกรรม)
+document.querySelectorAll('a[href^="#"]').forEach(a => a.addEventListener("click", e => {
+  const el = document.getElementById(a.getAttribute("href").slice(1));
+  if (el) { e.preventDefault(); el.scrollIntoView({ behavior: "smooth" }); }
+}));
+</script>
 </head>
 <body>
 
